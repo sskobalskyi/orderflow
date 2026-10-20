@@ -59,7 +59,8 @@ app.UseExceptionHandler(errors => errors.Run(async ctx =>
     if (ex is DomainException)
     {
         ctx.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
-        await Results.Problem(ex.Message, statusCode: 422, title: "Invalid order").ExecuteAsync(ctx);
+        await Results.Problem(ex.Message, statusCode: 422, title: "Invalid order",
+            extensions: new Dictionary<string, object?> { ["code"] = ((DomainException)ex).Code }).ExecuteAsync(ctx);
     }
     else
     {

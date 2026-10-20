@@ -1,0 +1,37 @@
+{
+  "app": { "title": "Orderflow", "language": "Language" },
+  "auth": { "signIn": "Sign in", "signOut": "Sign out", "signedInAs": "Signed in as {{name}}", "welcome": "Sign in to place and track orders." },
+  "form": {
+    "title": "New order",
+    "sku": "SKU",
+    "quantity": "Quantity",
+    "unitPrice": "Unit price",
+    "addLine": "Add line",
+    "removeLine": "Remove",
+    "total": "Total: {{total}}",
+    "submit": "Place order",
+    "submitting": "Placing order…",
+    "hint": "Demo stock: A (100), B (50), C (5). Orders above 1000 are declined by Payments."
+  },
+  "orders": { "title": "Your orders", "empty": "No orders yet.", "created": "Created", "total": "Total", "status": "Status", "select": "Select an order to see its saga timeline.", "loading": "Loading…" },
+  "status": { "Submitted": "Submitted", "Confirmed": "Confirmed", "Rejected": "Rejected" },
+  "timeline": {
+    "title": "Saga timeline",
+    "steps": {
+      "Submitted": "Order submitted",
+      "StockReserved": "Stock reserved",
+      "StockRejected": "Stock unavailable",
+      "PaymentCompleted": "Payment completed",
+      "PaymentFailed": "Payment failed",
+      "Confirmed": "Order confirmed",
+      "Rejected": "Order rejected"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "rateLimited": "Too many requests. Please wait a moment.",
+    "unauthorized": "Your session has expired. Please sign in again.",
+    "order_empty": "An order needs at least one line.",
+    "order_invalid_line": "Every line needs a SKU, a positive quantity and a non-negative price."
+  }
+}

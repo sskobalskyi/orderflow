@@ -2,7 +2,7 @@
 
 Event-driven order processing built from small .NET services coordinated by a saga. A portfolio project showing microservices, the transactional outbox, CQRS, an API gateway and OIDC, all running locally in Docker.
 
-> Status: early. Orders, Payments and Inventory run an orchestrated saga with compensation; the React UI is next.
+> Status: early. Orders, Payments and Inventory run an orchestrated saga with compensation; the React UI is in; integration and E2E tests are next.
 
 ## Architecture (target)
 
@@ -27,7 +27,9 @@ docker compose up --build
 
 | Service | URL |
 | --- | --- |
-| Orders API | http://localhost:8080 (via gateway) |
+| Web UI | http://localhost:5173 (sign in as demo / demo or alice / alice) |
+| API gateway | http://localhost:8080 |
+| Keycloak | http://localhost:8180 (admin / admin) |
 | RabbitMQ UI | http://localhost:15672 (guest / guest) |
 
 ```powershell
@@ -54,7 +56,7 @@ Decisions are recorded in [docs/adr](docs/adr).
 - [ ] Replay tooling for `*_error` queues
 - [x] CQRS read model (`GET /orders/{id}/timeline`) and Redis `Idempotency-Key` on `POST /orders`
 - [x] YARP gateway (JWT, rate limiting, CORS) and Keycloak with demo users `demo` and `alice`
-- [ ] React UI with saga timeline, `en` / `uk`
+- [x] React UI (Vite, TanStack Query, oidc-client-ts) with order form, list and live saga timeline, `en` / `uk`
 - [ ] OpenTelemetry into the shared observability stack
 
 ## Try the saga

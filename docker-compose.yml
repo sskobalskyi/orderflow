@@ -87,5 +87,10 @@ services:
     ports: ["8080:8080"]
     depends_on: [orders, keycloak]
 
+  web:
+    build: { context: ./web }
+    ports: ["5173:80"]
+    depends_on: [gateway]
+
 volumes:
   pgdata:

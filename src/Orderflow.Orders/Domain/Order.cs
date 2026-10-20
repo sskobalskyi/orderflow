@@ -21,9 +21,9 @@ public class Order
     {
         var list = lines.ToList();
         if (list.Count == 0)
-            throw new DomainException("An order needs at least one line.");
+            throw new DomainException("order_empty", "An order needs at least one line.");
         if (list.Any(l => l.Quantity <= 0 || l.UnitPrice < 0 || string.IsNullOrWhiteSpace(l.Sku)))
-            throw new DomainException("Every line needs a SKU, a positive quantity and a non-negative price.");
+            throw new DomainException("order_invalid_line", "Every line needs a SKU, a positive quantity and a non-negative price.");
 
         var order = new Order
         {
@@ -53,4 +53,8 @@ public class Order
     public OrderSubmitted ToSubmittedEvent() => new(Id, CustomerId, Lines, Total);
 }
 
-public class DomainException(string message) : Exception(message);
+/// <summary>A business rule violation. The code is a stable key clients use to localize the message.</summary>
+public class DomainException(string code, string message) : Exception(message)
+{
+    public string Code { get; } = code;
+}
