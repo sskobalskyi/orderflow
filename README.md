@@ -2,7 +2,7 @@
 
 Event-driven order processing built from small .NET services coordinated by a saga. A portfolio project showing microservices, the transactional outbox, CQRS, an API gateway and OIDC, all running locally in Docker.
 
-> Status: early. Orders, Payments and Inventory run an orchestrated saga with compensation; gateway, Keycloak and the React UI are next.
+> Status: early. Orders, Payments and Inventory run an orchestrated saga with compensation; the React UI is next.
 
 ## Architecture (target)
 
@@ -27,12 +27,15 @@ docker compose up --build
 
 | Service | URL |
 | --- | --- |
-| Orders API | http://localhost:8081 |
+| Orders API | http://localhost:8080 (via gateway) |
 | RabbitMQ UI | http://localhost:15672 (guest / guest) |
 
 ```powershell
-curl -X POST http://localhost:8081/orders -H "content-type: application/json" `
-  -d '{"customerId":"11111111-1111-1111-1111-111111111111","lines":[{"sku":"A","quantity":2,"unitPrice":10}]}'
+# Get a token for the demo user, then call the API through the gateway
+$token = (curl.exe -s -X POST http://localhost:8180/realms/orderflow/protocol/openid-connect/token `
+  -d client_id=orderflow-web -d grant_type=password -d username=demo -d password=demo | ConvertFrom-Json).access_token
+curl.exe -X POST http://localhost:8080/api/orders -H "Authorization: Bearer $token" -H "content-type: application/json" `
+  -d "{\"lines\":[{\"sku\":\"A\",\"quantity\":2,\"unitPrice\":10}]}"
 ```
 
 ## Test
@@ -50,7 +53,7 @@ Decisions are recorded in [docs/adr](docs/adr).
 - [x] Notifications service (idempotent), failed messages land in `*_error` queues after retries
 - [ ] Replay tooling for `*_error` queues
 - [x] CQRS read model (`GET /orders/{id}/timeline`) and Redis `Idempotency-Key` on `POST /orders`
-- [ ] YARP gateway and Keycloak
+- [x] YARP gateway (JWT, rate limiting, CORS) and Keycloak with demo users `demo` and `alice`
 - [ ] React UI with saga timeline, `en` / `uk`
 - [ ] OpenTelemetry into the shared observability stack
 

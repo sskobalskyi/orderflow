@@ -43,7 +43,6 @@ services:
       ConnectionStrings__Orders: Host=postgres;Database=orders;Username=orderflow;Password=orderflow
       Redis__Configuration: redis:6379
       RabbitMq__Host: rabbitmq
-    ports: ["8081:8080"]
 
   payments:
     <<: *service
@@ -67,6 +66,26 @@ services:
       ConnectionStrings__Inventory: Host=postgres;Database=inventory;Username=orderflow;Password=orderflow
       RabbitMq__Host: rabbitmq
     ports: ["8082:8080"]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes: ["./keycloak/orderflow-realm.json:/opt/keycloak/data/import/orderflow-realm.json:ro"]
+    ports: ["8180:8080"]
+
+  gateway:
+    build: { context: ., args: { SERVICE: Gateway } }
+    environment:
+      Auth__MetadataAddress: http://keycloak:8080/realms/orderflow/.well-known/openid-configuration
+      Auth__Issuer: http://localhost:8180/realms/orderflow
+      ReverseProxy__Clusters__orders__Destinations__d1__Address: http://orders:8080
+    ports: ["8080:8080"]
+    depends_on: [orders, keycloak]
 
 volumes:
   pgdata:

@@ -1,0 +1,40 @@
+{
+  "realm": "orderflow",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "clients": [
+    {
+      "clientId": "orderflow-web",
+      "name": "Orderflow web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [ "http://localhost:5173/*" ],
+      "webOrigins": [ "http://localhost:5173" ],
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    }
+  ],
+  "users": [
+    {
+      "username": "demo",
+      "email": "demo@orderflow.local",
+      "firstName": "Demo",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [ { "type": "password", "value": "demo", "temporary": false } ]
+    },
+    {
+      "username": "alice",
+      "email": "alice@orderflow.local",
+      "firstName": "Alice",
+      "lastName": "Example",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [ { "type": "password", "value": "alice", "temporary": false } ]
+    }
+  ]
+}
