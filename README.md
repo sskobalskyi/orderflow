@@ -53,7 +53,7 @@ Decisions are recorded in [docs/adr](docs/adr).
 - [x] Order saga (MassTransit state machine) with stock release on payment failure
 - [x] Payments and Inventory with outbox and idempotent consumers
 - [x] Notifications service (idempotent), failed messages land in `*_error` queues after retries
-- [ ] Replay tooling for `*_error` queues
+- [x] EF Core migrations per service and `scripts/replay-errors.ps1` to replay `*_error` queues
 - [x] CQRS read model (`GET /orders/{id}/timeline`) and Redis `Idempotency-Key` on `POST /orders`
 - [x] YARP gateway (JWT, rate limiting, CORS) and Keycloak with demo users `demo` and `alice`
 - [x] React UI (Vite, TanStack Query, oidc-client-ts) with order form, list and live saga timeline, `en` / `uk`
@@ -75,3 +75,12 @@ Stock levels: http://localhost:8082/stock · Notifications: http://localhost:808
 - `tests/Orderflow.Orders.Tests`: domain rules and the saga state machine (MassTransit test harness).
 - `tests/Orderflow.IntegrationTests`: real PostgreSQL, RabbitMQ and Redis via Testcontainers with the four services in-process. Covers the happy path, compensation, out-of-stock, idempotency, customer isolation and notifications.
 - `web/e2e`: Playwright against the full stack (`docker compose up -d --build`, then `cd web && npm run e2e`): Keycloak login, order, saga timeline, `uk` locale.
+
+## Operations
+Messages that still fail after retries are parked in `<queue>_error` (see the RabbitMQ UI). After fixing the cause, replay them:
+
+```powershell
+./scripts/replay-errors.ps1 -WhatIf   # list what would be replayed
+./scripts/replay-errors.ps1           # move every *_error message back to its queue
+```
+Each service applies its EF Core migrations on startup (`src/*/Migrations`).

@@ -31,7 +31,7 @@ builder.Services.AddHealthChecks().AddNpgSql(builder.Configuration.GetConnection
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
-    await scope.ServiceProvider.GetRequiredService<NotificationsDbContext>().Database.EnsureCreatedAsync();
+    await scope.ServiceProvider.GetRequiredService<NotificationsDbContext>().Database.MigrateAsync();
 
 app.MapHealthChecks("/health");
 app.MapGet("/notifications", async (NotificationsDbContext db) =>

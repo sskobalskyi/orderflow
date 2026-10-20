@@ -69,11 +69,11 @@ app.UseExceptionHandler(errors => errors.Run(async ctx =>
     }
 }));
 
-// Demo-grade: create the schema on startup. A migration bundle is the production-grade path.
-if (app.Configuration.GetValue("Database:EnsureCreated", true))
+// Demo-grade: apply migrations on startup. A migration bundle is the production-grade path.
+if (app.Configuration.GetValue("Database:Migrate", true))
 {
     using var scope = app.Services.CreateScope();
-    await scope.ServiceProvider.GetRequiredService<OrdersDbContext>().Database.EnsureCreatedAsync();
+    await scope.ServiceProvider.GetRequiredService<OrdersDbContext>().Database.MigrateAsync();
 }
 
 app.MapHealthChecks("/health");
