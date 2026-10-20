@@ -1,18 +1,22 @@
 using MassTransit;
+using MassTransit.EntityFrameworkCoreIntegration;
 using Microsoft.EntityFrameworkCore;
 using Orderflow.Contracts;
 using Orderflow.Orders.Domain;
 
 namespace Orderflow.Orders.Infrastructure;
 
-public class OrdersDbContext(DbContextOptions<OrdersDbContext> options) : DbContext(options)
+public class OrdersDbContext(DbContextOptions<OrdersDbContext> options) : SagaDbContext(options)
 {
     public const string Schema = "orders";
 
     public DbSet<Order> Orders => Set<Order>();
 
+    protected override IEnumerable<ISagaClassMap> Configurations => [new OrderStateMap()];
+
     protected override void OnModelCreating(ModelBuilder b)
     {
+        base.OnModelCreating(b);
         b.HasDefaultSchema(Schema);
 
         b.Entity<Order>(e =>

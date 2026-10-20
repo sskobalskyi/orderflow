@@ -13,4 +13,4 @@ MassTransit is pinned to v8 (Apache-2.0); v9 is commercial.
 ## Consequences
 - No dual-write problem; delivery survives broker outages.
 - Duplicates are possible, so every consumer must be idempotent.
-- Each service owns a schema (`orders`, later `payments`, `inventory`) in one PostgreSQL instance to keep local setup light.
+- Each service owns its own database (`orders`, `payments`, `inventory`) inside one PostgreSQL container to keep local setup light.

@@ -32,6 +32,6 @@ public static class OrderEndpoints
 
     private static object ToDto(Order o) => new
     {
-        o.Id, o.CustomerId, Status = o.Status.ToString(), o.CreatedAt, o.Lines, o.Total,
+        o.Id, o.CustomerId, Status = o.Status.ToString(), o.RejectionReason, o.CreatedAt, o.Lines, o.Total,
     };
 }

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Orderflow.Orders.Api;
 using Orderflow.Orders.Domain;
 using Orderflow.Orders.Infrastructure;
+using Orderflow.Orders.Sagas;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,16 @@ builder.Services.AddDbContext<OrdersDbContext>(o =>
 
 builder.Services.AddMassTransit(x =>
 {
+    x.AddConsumer<OrderConfirmedConsumer>();
+    x.AddConsumer<OrderRejectedConsumer>();
+    x.AddSagaStateMachine<OrderStateMachine, OrderState>()
+        .EntityFrameworkRepository(r =>
+        {
+            r.ConcurrencyMode = ConcurrencyMode.Optimistic;
+            r.ExistingDbContext<OrdersDbContext>();
+            r.UsePostgres();
+        });
+
     x.AddEntityFrameworkOutbox<OrdersDbContext>(o =>
     {
         o.UsePostgres();
@@ -28,6 +39,7 @@ builder.Services.AddMassTransit(x =>
             h.Username(builder.Configuration["RabbitMq:Username"] ?? "guest");
             h.Password(builder.Configuration["RabbitMq:Password"] ?? "guest");
         });
+        cfg.UseMessageRetry(r => r.Exponential(5, TimeSpan.FromMilliseconds(200), TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)));
         cfg.ConfigureEndpoints(ctx);
     });
 });

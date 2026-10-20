@@ -1,7 +1,9 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Orderflow.Contracts/Orderflow.Contracts.csproj" />
+    <Project Path="src/Orderflow.Inventory/Orderflow.Inventory.csproj" />
     <Project Path="src/Orderflow.Orders/Orderflow.Orders.csproj" />
+    <Project Path="src/Orderflow.Payments/Orderflow.Payments.csproj" />
     <Project Path="tests/Orderflow.Orders.Tests/Orderflow.Orders.Tests.csproj" />
   </Folder>
 </Solution>

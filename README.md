@@ -2,7 +2,7 @@
 
 Event-driven order processing built from small .NET services coordinated by a saga. A portfolio project showing microservices, the transactional outbox, CQRS, an API gateway and OIDC, all running locally in Docker.
 
-> Status: early. The Orders service and its outbox are in place; the saga, Payments, Inventory, Notifications, gateway, Keycloak and the React UI are next.
+> Status: early. Orders, Payments and Inventory run an orchestrated saga with compensation; Notifications, CQRS read model, gateway, Keycloak and the React UI are next.
 
 ## Architecture (target)
 
@@ -45,9 +45,22 @@ Decisions are recorded in [docs/adr](docs/adr).
 
 ## Roadmap
 - [x] Orders service with transactional outbox
-- [ ] Order saga (MassTransit state machine)
-- [ ] Payments, Inventory, Notifications with inbox idempotency, retries and DLQ
+- [x] Order saga (MassTransit state machine) with stock release on payment failure
+- [x] Payments and Inventory with outbox and idempotent consumers
+- [ ] Notifications, retry policies tuned and DLQ handling
 - [ ] CQRS read model, Redis idempotency keys
 - [ ] YARP gateway and Keycloak
 - [ ] React UI with saga timeline, `en` / `uk`
 - [ ] OpenTelemetry into the shared observability stack
+
+## Try the saga
+
+Seed stock: A=100, B=50, C=5. Payments declines totals above 1000.
+
+| Order | Outcome |
+| --- | --- |
+| 2 x A at 10 | `Confirmed` |
+| 1 x B at 5000 | `Rejected` (card declined), stock for B released |
+| 9 x C | `Rejected` (insufficient stock) |
+
+Stock levels: http://localhost:8082/stock

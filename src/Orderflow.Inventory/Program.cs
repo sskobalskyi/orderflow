@@ -1,0 +1,140 @@
+using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using Orderflow.Contracts;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<InventoryDbContext>(o =>
+    o.UseNpgsql(builder.Configuration.GetConnectionString("Inventory")));
+
+builder.Services.AddMassTransit(x =>
+{
+    x.AddConsumer<ReserveStockConsumer>();
+    x.AddConsumer<ReleaseStockConsumer>();
+
+    x.AddEntityFrameworkOutbox<InventoryDbContext>(o =>
+    {
+        o.UsePostgres();
+        o.UseBusOutbox();
+    });
+
+    x.UsingRabbitMq((ctx, cfg) =>
+    {
+        cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
+        {
+            h.Username(builder.Configuration["RabbitMq:Username"] ?? "guest");
+            h.Password(builder.Configuration["RabbitMq:Password"] ?? "guest");
+        });
+        cfg.UseMessageRetry(r => r.Exponential(5, TimeSpan.FromMilliseconds(200), TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)));
+        cfg.ConfigureEndpoints(ctx);
+    });
+});
+
+builder.Services.AddHealthChecks().AddNpgSql(builder.Configuration.GetConnectionString("Inventory")!);
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+    await db.Database.EnsureCreatedAsync();
+    if (!await db.Stock.AnyAsync())
+    {
+        db.Stock.AddRange(new StockItem("A", 100), new StockItem("B", 50), new StockItem("C", 5));
+        await db.SaveChangesAsync();
+    }
+}
+
+app.MapHealthChecks("/health");
+app.MapGet("/stock", async (InventoryDbContext db) => await db.Stock.AsNoTracking().OrderBy(s => s.Sku).ToListAsync());
+app.Run();
+
+public class StockItem(string sku, int available)
+{
+    public string Sku { get; set; } = sku;
+    public int Available { get; set; } = available;
+    public uint RowVersion { get; set; }
+}
+
+public class Reservation
+{
+    public Guid OrderId { get; set; }
+    public string Sku { get; set; } = null!;
+    public int Quantity { get; set; }
+}
+
+public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : DbContext(options)
+{
+    public DbSet<StockItem> Stock => Set<StockItem>();
+    public DbSet<Reservation> Reservations => Set<Reservation>();
+
+    protected override void OnModelCreating(ModelBuilder b)
+    {
+        b.HasDefaultSchema("inventory");
+        b.Entity<StockItem>(e =>
+        {
+            e.ToTable("stock");
+            e.HasKey(s => s.Sku);
+            e.Property(s => s.RowVersion).HasColumnName("xmin").HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
+        });
+        b.Entity<Reservation>(e =>
+        {
+            e.ToTable("reservations");
+            e.HasKey(r => new { r.OrderId, r.Sku });
+        });
+        b.AddInboxStateEntity();
+        b.AddOutboxMessageEntity();
+        b.AddOutboxStateEntity();
+    }
+}
+
+/// <summary>All-or-nothing reservation. Idempotent: an order that already holds a reservation is acknowledged again.</summary>
+public class ReserveStockConsumer(InventoryDbContext db) : IConsumer<ReserveStock>
+{
+    public async Task Consume(ConsumeContext<ReserveStock> context)
+    {
+        var msg = context.Message;
+
+        if (await db.Reservations.AnyAsync(r => r.OrderId == msg.OrderId, context.CancellationToken))
+        {
+            await context.Publish(new StockReserved(msg.OrderId));
+            return;
+        }
+
+        var wanted = msg.Lines.GroupBy(l => l.Sku).ToDictionary(g => g.Key, g => g.Sum(l => l.Quantity));
+        var items = await db.Stock.Where(s => wanted.Keys.Contains(s.Sku)).ToDictionaryAsync(s => s.Sku, context.CancellationToken);
+
+        var missing = wanted.Where(w => !items.TryGetValue(w.Key, out var i) || i.Available < w.Value).Select(w => w.Key).ToList();
+        if (missing.Count > 0)
+        {
+            await context.Publish(new StockRejected(msg.OrderId, $"Insufficient stock for: {string.Join(", ", missing)}"));
+            return;
+        }
+
+        foreach (var (sku, qty) in wanted)
+        {
+            items[sku].Available -= qty;
+            db.Reservations.Add(new Reservation { OrderId = msg.OrderId, Sku = sku, Quantity = qty });
+        }
+
+        await context.Publish(new StockReserved(msg.OrderId));
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+}
+
+/// <summary>Compensation: returns reserved quantities. Idempotent because reservations are deleted once released.</summary>
+public class ReleaseStockConsumer(InventoryDbContext db) : IConsumer<ReleaseStock>
+{
+    public async Task Consume(ConsumeContext<ReleaseStock> context)
+    {
+        var reservations = await db.Reservations.Where(r => r.OrderId == context.Message.OrderId).ToListAsync(context.CancellationToken);
+        foreach (var r in reservations)
+        {
+            (await db.Stock.FindAsync([r.Sku], context.CancellationToken))!.Available += r.Quantity;
+            db.Reservations.Remove(r);
+        }
+
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+}

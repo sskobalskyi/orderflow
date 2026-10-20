@@ -1,14 +1,20 @@
 name: orderflow
 
+x-service: &service
+  depends_on:
+    postgres: { condition: service_healthy }
+    rabbitmq: { condition: service_healthy }
+
 services:
   postgres:
     image: postgres:17
     environment:
       POSTGRES_USER: orderflow
       POSTGRES_PASSWORD: orderflow
-      POSTGRES_DB: orderflow
     ports: ["5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U orderflow"]
       interval: 5s
@@ -23,16 +29,27 @@ services:
       retries: 10
 
   orders:
-    build:
-      context: .
-      dockerfile: src/Orderflow.Orders/Dockerfile
+    <<: *service
+    build: { context: ., args: { SERVICE: Orders } }
     environment:
-      ConnectionStrings__Orders: Host=postgres;Database=orderflow;Username=orderflow;Password=orderflow
+      ConnectionStrings__Orders: Host=postgres;Database=orders;Username=orderflow;Password=orderflow
       RabbitMq__Host: rabbitmq
     ports: ["8081:8080"]
-    depends_on:
-      postgres: { condition: service_healthy }
-      rabbitmq: { condition: service_healthy }
+
+  payments:
+    <<: *service
+    build: { context: ., args: { SERVICE: Payments } }
+    environment:
+      ConnectionStrings__Payments: Host=postgres;Database=payments;Username=orderflow;Password=orderflow
+      RabbitMq__Host: rabbitmq
+
+  inventory:
+    <<: *service
+    build: { context: ., args: { SERVICE: Inventory } }
+    environment:
+      ConnectionStrings__Inventory: Host=postgres;Database=inventory;Username=orderflow;Password=orderflow
+      RabbitMq__Host: rabbitmq
+    ports: ["8082:8080"]
 
 volumes:
   pgdata:

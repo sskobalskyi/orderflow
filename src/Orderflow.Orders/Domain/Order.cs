@@ -36,6 +36,20 @@ public class Order
         return order;
     }
 
+    public string? RejectionReason { get; private set; }
+
+    public void Confirm()
+    {
+        if (Status == OrderStatus.Submitted) Status = OrderStatus.Confirmed;
+    }
+
+    public void Reject(string reason)
+    {
+        if (Status != OrderStatus.Submitted) return;
+        Status = OrderStatus.Rejected;
+        RejectionReason = reason;
+    }
+
     public OrderSubmitted ToSubmittedEvent() => new(Id, CustomerId, Lines, Total);
 }
 
