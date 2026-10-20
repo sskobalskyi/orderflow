@@ -1,4 +1,5 @@
 using MassTransit;
+using StackExchange.Redis;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Orderflow.Orders.Api;
@@ -10,6 +11,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+    ConnectionMultiplexer.Connect(builder.Configuration["Redis:Configuration"] ?? "localhost:6379"));
 builder.Services.AddDbContext<OrdersDbContext>(o =>
     o.UseNpgsql(builder.Configuration.GetConnectionString("Orders"),
         n => n.MigrationsHistoryTable("__ef_migrations", OrdersDbContext.Schema)));
@@ -18,6 +21,7 @@ builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<OrderConfirmedConsumer>();
     x.AddConsumer<OrderRejectedConsumer>();
+    x.AddConsumer<OrderTimelineProjector>();
     x.AddSagaStateMachine<OrderStateMachine, OrderState>()
         .EntityFrameworkRepository(r =>
         {

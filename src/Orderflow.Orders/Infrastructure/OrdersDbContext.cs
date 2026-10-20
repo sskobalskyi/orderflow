@@ -11,6 +11,7 @@ public class OrdersDbContext(DbContextOptions<OrdersDbContext> options) : SagaDb
     public const string Schema = "orders";
 
     public DbSet<Order> Orders => Set<Order>();
+    public DbSet<TimelineEntry> Timeline => Set<TimelineEntry>();
 
     protected override IEnumerable<ISagaClassMap> Configurations => [new OrderStateMap()];
 
@@ -34,6 +35,14 @@ public class OrdersDbContext(DbContextOptions<OrdersDbContext> options) : SagaDb
                 l.Property(x => x.Sku).HasMaxLength(64);
                 l.Property(x => x.UnitPrice).HasPrecision(18, 2);
             });
+        });
+
+        b.Entity<TimelineEntry>(e =>
+        {
+            e.ToTable("order_timeline");
+            e.HasIndex(t => new { t.OrderId, t.Step }).IsUnique();
+            e.Property(t => t.Step).HasMaxLength(40);
+            e.Property(t => t.Detail).HasMaxLength(500);
         });
 
         // Transactional outbox tables: events are stored in the same transaction as the order.

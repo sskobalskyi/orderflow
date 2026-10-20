@@ -4,6 +4,7 @@ x-service: &service
   depends_on:
     postgres: { condition: service_healthy }
     rabbitmq: { condition: service_healthy }
+    redis: { condition: service_healthy }
 
 services:
   postgres:
@@ -28,11 +29,19 @@ services:
       interval: 10s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
   orders:
     <<: *service
     build: { context: ., args: { SERVICE: Orders } }
     environment:
       ConnectionStrings__Orders: Host=postgres;Database=orders;Username=orderflow;Password=orderflow
+      Redis__Configuration: redis:6379
       RabbitMq__Host: rabbitmq
     ports: ["8081:8080"]
 
@@ -42,6 +51,14 @@ services:
     environment:
       ConnectionStrings__Payments: Host=postgres;Database=payments;Username=orderflow;Password=orderflow
       RabbitMq__Host: rabbitmq
+
+  notifications:
+    <<: *service
+    build: { context: ., args: { SERVICE: Notifications } }
+    environment:
+      ConnectionStrings__Notifications: Host=postgres;Database=notifications;Username=orderflow;Password=orderflow
+      RabbitMq__Host: rabbitmq
+    ports: ["8083:8080"]
 
   inventory:
     <<: *service
