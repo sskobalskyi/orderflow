@@ -6,7 +6,7 @@ Status: accepted
 Confirming an order spans Inventory and Payments, each with its own database. A distributed transaction is not an option.
 
 ## Decision
-A MassTransit state machine in Orders orchestrates the flow: `OrderSubmitted` -> reserve stock -> take payment -> `OrderConfirmed`. If payment fails, the saga publishes `ReleaseStock` (compensation) and `OrderRejected`. Saga state lives in `orders.order_saga` with an optimistic `xmin` concurrency token. Finished instances are kept so the UI can render a timeline.
+A MassTransit state machine in Orders orchestrates the flow: `OrderSubmitted` -> reserve stock -> take payment -> `OrderConfirmed`. If payment fails, the saga publishes `ReleaseStock` (compensation) and `OrderRejected`. Saga state lives in `app.order_saga` with an optimistic `xmin` concurrency token. Finished instances are kept so the UI can render a timeline.
 
 Orchestration was chosen over choreography because the flow has one owner and an explicit compensation step that is easy to test in isolation (see `OrderStateMachineTests`).
 

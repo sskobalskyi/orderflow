@@ -19,7 +19,7 @@ builder.Services.AddMassTransit(x =>
 
     x.UsingRabbitMq((ctx, cfg) =>
     {
-        cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
+        cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", builder.Configuration.GetValue("RabbitMq:Port", (ushort)5672), "/", h =>
         {
             h.Username(builder.Configuration["RabbitMq:Username"] ?? "guest");
             h.Password(builder.Configuration["RabbitMq:Password"] ?? "guest");
@@ -53,7 +53,7 @@ public class PaymentsDbContext(DbContextOptions<PaymentsDbContext> options) : Db
 
     protected override void OnModelCreating(ModelBuilder b)
     {
-        b.HasDefaultSchema("payments");
+        b.HasDefaultSchema("app");
         b.Entity<Payment>(e =>
         {
             e.ToTable("payments");
@@ -99,3 +99,5 @@ public class ProcessPaymentConsumer(PaymentsDbContext db, IConfiguration config)
         await db.SaveChangesAsync(context.CancellationToken);
     }
 }
+
+public partial class Program;

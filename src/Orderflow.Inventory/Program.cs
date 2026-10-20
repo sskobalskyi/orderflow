@@ -20,7 +20,7 @@ builder.Services.AddMassTransit(x =>
 
     x.UsingRabbitMq((ctx, cfg) =>
     {
-        cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
+        cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", builder.Configuration.GetValue("RabbitMq:Port", (ushort)5672), "/", h =>
         {
             h.Username(builder.Configuration["RabbitMq:Username"] ?? "guest");
             h.Password(builder.Configuration["RabbitMq:Password"] ?? "guest");
@@ -61,6 +61,7 @@ public class Reservation
     public Guid OrderId { get; set; }
     public string Sku { get; set; } = null!;
     public int Quantity { get; set; }
+    public bool Released { get; set; }
 }
 
 public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : DbContext(options)
@@ -70,7 +71,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
 
     protected override void OnModelCreating(ModelBuilder b)
     {
-        b.HasDefaultSchema("inventory");
+        b.HasDefaultSchema("app");
         b.Entity<StockItem>(e =>
         {
             e.ToTable("stock");
@@ -96,9 +97,12 @@ public class ReserveStockConsumer(InventoryDbContext db) : IConsumer<ReserveStoc
     {
         var msg = context.Message;
 
-        if (await db.Reservations.AnyAsync(r => r.OrderId == msg.OrderId, context.CancellationToken))
+        var existing = await db.Reservations.Where(r => r.OrderId == msg.OrderId).ToListAsync(context.CancellationToken);
+        if (existing.Count > 0)
         {
-            await context.Publish(new StockReserved(msg.OrderId));
+            // Redelivery: re-acknowledge a live reservation, but never re-reserve stock that was already released.
+            if (existing.All(r => !r.Released))
+                await context.Publish(new StockReserved(msg.OrderId));
             return;
         }
 
@@ -123,18 +127,21 @@ public class ReserveStockConsumer(InventoryDbContext db) : IConsumer<ReserveStoc
     }
 }
 
-/// <summary>Compensation: returns reserved quantities. Idempotent because reservations are deleted once released.</summary>
+/// <summary>Compensation: returns reserved quantities. Idempotent: reservations are kept and flagged as released.</summary>
 public class ReleaseStockConsumer(InventoryDbContext db) : IConsumer<ReleaseStock>
 {
     public async Task Consume(ConsumeContext<ReleaseStock> context)
     {
-        var reservations = await db.Reservations.Where(r => r.OrderId == context.Message.OrderId).ToListAsync(context.CancellationToken);
+        var reservations = await db.Reservations
+            .Where(r => r.OrderId == context.Message.OrderId && !r.Released).ToListAsync(context.CancellationToken);
         foreach (var r in reservations)
         {
             (await db.Stock.FindAsync([r.Sku], context.CancellationToken))!.Available += r.Quantity;
-            db.Reservations.Remove(r);
+            r.Released = true;
         }
 
         await db.SaveChangesAsync(context.CancellationToken);
     }
 }
+
+public partial class Program;

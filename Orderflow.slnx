@@ -8,4 +8,7 @@
     <Project Path="src/Orderflow.Payments/Orderflow.Payments.csproj" />
     <Project Path="tests/Orderflow.Orders.Tests/Orderflow.Orders.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Orderflow.IntegrationTests/Orderflow.IntegrationTests.csproj" />
+  </Folder>
 </Solution>

@@ -43,7 +43,7 @@ curl.exe -X POST http://localhost:8080/api/orders -H "Authorization: Bearer $tok
 ## Test
 
 ```powershell
-dotnet test
+dotnet test          # unit + Testcontainers integration tests (needs Docker)
 ```
 
 Decisions are recorded in [docs/adr](docs/adr).
@@ -70,3 +70,8 @@ Seed stock: A=100, B=50, C=5. Payments declines totals above 1000.
 | 9 x C | `Rejected` (insufficient stock) |
 
 Stock levels: http://localhost:8082/stock · Notifications: http://localhost:8083/notifications · Timeline: `GET /orders/{id}/timeline`
+
+## Tests
+- `tests/Orderflow.Orders.Tests`: domain rules and the saga state machine (MassTransit test harness).
+- `tests/Orderflow.IntegrationTests`: real PostgreSQL, RabbitMQ and Redis via Testcontainers with the four services in-process. Covers the happy path, compensation, out-of-stock, idempotency, customer isolation and notifications.
+- `web/e2e`: Playwright against the full stack (`docker compose up -d --build`, then `cd web && npm run e2e`): Keycloak login, order, saga timeline, `uk` locale.

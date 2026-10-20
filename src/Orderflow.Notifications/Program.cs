@@ -16,7 +16,7 @@ builder.Services.AddMassTransit(x =>
 
     x.UsingRabbitMq((ctx, cfg) =>
     {
-        cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
+        cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", builder.Configuration.GetValue("RabbitMq:Port", (ushort)5672), "/", h =>
         {
             h.Username(builder.Configuration["RabbitMq:Username"] ?? "guest");
             h.Password(builder.Configuration["RabbitMq:Password"] ?? "guest");
@@ -52,7 +52,7 @@ public class NotificationsDbContext(DbContextOptions<NotificationsDbContext> opt
 
     protected override void OnModelCreating(ModelBuilder b)
     {
-        b.HasDefaultSchema("notifications");
+        b.HasDefaultSchema("app");
         b.Entity<Notification>(e =>
         {
             e.ToTable("notifications");
@@ -83,3 +83,5 @@ public class OrderOutcomeNotifier(NotificationsDbContext db, ILogger<OrderOutcom
         await db.SaveChangesAsync(ct);
     }
 }
+
+public partial class Program;

@@ -8,7 +8,9 @@ namespace Orderflow.Orders.Infrastructure;
 
 public class OrdersDbContext(DbContextOptions<OrdersDbContext> options) : SagaDbContext(options)
 {
-    public const string Schema = "orders";
+    // Every service owns a separate database, so the schema name can be uniform. MassTransit caches its
+    // outbox SQL statically per process, which also makes in-process integration tests work.
+    public const string Schema = "app";
 
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<TimelineEntry> Timeline => Set<TimelineEntry>();
