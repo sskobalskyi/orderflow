@@ -46,7 +46,7 @@ using (var scope = app.Services.CreateScope())
     await db.Database.MigrateAsync();
     if (!await db.Stock.AnyAsync())
     {
-        db.Stock.AddRange(new StockItem("A", 100), new StockItem("B", 50), new StockItem("C", 5));
+        db.Stock.AddRange(new StockItem("LAMP-01", 100), new StockItem("MUG-01", 50), new StockItem("DESK-01", 5));
         await db.SaveChangesAsync();
     }
 }

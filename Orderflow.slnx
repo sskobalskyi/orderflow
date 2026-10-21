@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Orderflow.Catalog/Orderflow.Catalog.csproj" />
     <Project Path="src/Orderflow.Contracts/Orderflow.Contracts.csproj" />
     <Project Path="src/Orderflow.Gateway/Orderflow.Gateway.csproj" />
     <Project Path="src/Orderflow.Inventory/Orderflow.Inventory.csproj" />

@@ -13,6 +13,9 @@ builder.AddOrderflowTelemetry("orders");
 
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHostedService<IntegrationOutboxPublisher>();
+builder.Services.AddHttpClient<CatalogClient>(c => c.BaseAddress = new Uri(builder.Configuration["Catalog:BaseUrl"] ?? "http://localhost:8084"))
+    .AddStandardResilienceHandler();
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     ConnectionMultiplexer.Connect(builder.Configuration["Redis:Configuration"] ?? "localhost:6379"));
 builder.Services.AddDbContext<OrdersDbContext>(o =>
@@ -23,6 +26,7 @@ builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<OrderConfirmedConsumer>();
     x.AddConsumer<OrderRejectedConsumer>();
+    x.AddConsumer<PaymentRefundedConsumer>();
     x.AddConsumer<OrderTimelineProjector>();
     x.AddSagaStateMachine<OrderStateMachine, OrderState>()
         .EntityFrameworkRepository(r =>

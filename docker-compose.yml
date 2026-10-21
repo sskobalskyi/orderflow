@@ -42,7 +42,15 @@ services:
     environment:
       ConnectionStrings__Orders: Host=postgres;Database=orders;Username=orderflow;Password=orderflow
       Redis__Configuration: redis:6379
+      Catalog__BaseUrl: http://catalog:8080
       RabbitMq__Host: rabbitmq
+
+  catalog:
+    <<: *service
+    build: { context: ., args: { SERVICE: Catalog } }
+    environment:
+      ConnectionStrings__Catalog: Host=postgres;Database=catalog;Username=orderflow;Password=orderflow
+    ports: ["8084:8080"]
 
   payments:
     <<: *service
@@ -84,8 +92,9 @@ services:
       Auth__MetadataAddress: http://keycloak:8080/realms/orderflow/.well-known/openid-configuration
       Auth__Issuer: http://localhost:8180/realms/orderflow
       ReverseProxy__Clusters__orders__Destinations__d1__Address: http://orders:8080
+      ReverseProxy__Clusters__catalog__Destinations__d1__Address: http://catalog:8080
     ports: ["8080:8080"]
-    depends_on: [orders, keycloak]
+    depends_on: [orders, catalog, keycloak]
 
   web:
     build: { context: ./web }

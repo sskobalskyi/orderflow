@@ -13,4 +13,5 @@ Keycloak runs with a fixed public hostname (`http://localhost:8180`) so token is
 ## Consequences
 - One place for authentication, CORS and rate limiting.
 - Internal services trust the network boundary; mutual TLS or token propagation would be the next step beyond a local setup.
-- Demo users: `demo` / `demo` and `alice` / `alice` (realm in `keycloak/orderflow-realm.json`).
+- Demo users: `demo` / `demo`, `alice` / `alice` and `admin` / `admin` (realm in `keycloak/orderflow-realm.json`).
+- Admin routes (`/api/admin/**`) require the realm role `admin`, flattened into a `roles` claim by a protocol mapper. Customers get 403. The catalog read routes are public.

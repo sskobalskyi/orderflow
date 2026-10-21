@@ -1,0 +1,29 @@
+[
+  {
+    "sku": "LAMP-01",
+    "price": 25.00,
+    "currency": "USD",
+    "translations": {
+      "en": { "name": "Desk lamp", "description": "Adjustable LED desk lamp with a warm and a cold mode." },
+      "uk": { "name": "Настільна лампа", "description": "Регульована світлодіодна лампа з теплим і холодним режимами." }
+    }
+  },
+  {
+    "sku": "MUG-01",
+    "price": 12.50,
+    "currency": "USD",
+    "translations": {
+      "en": { "name": "Ceramic mug", "description": "Dishwasher-safe 350 ml mug." },
+      "uk": { "name": "Керамічна чашка", "description": "Чашка 350 мл, придатна для посудомийної машини." }
+    }
+  },
+  {
+    "sku": "DESK-01",
+    "price": 1200.00,
+    "currency": "USD",
+    "translations": {
+      "en": { "name": "Standing desk", "description": "Electric height-adjustable desk. Limited stock; large orders may be declined by the payment mock." },
+      "uk": { "name": "Стіл з регулюванням висоти", "description": "Електричний стіл з регулюванням висоти. Обмежена кількість; велике замовлення може відхилити імітація платежів." }
+    }
+  }
+]

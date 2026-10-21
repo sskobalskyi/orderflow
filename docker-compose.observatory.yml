@@ -20,3 +20,4 @@ services:
   payments: { environment: *otel, networks: [default, observatory] }
   inventory: { environment: *otel, networks: [default, observatory] }
   notifications: { environment: *otel, networks: [default, observatory] }
+  catalog: { environment: *otel, networks: [default, observatory] }

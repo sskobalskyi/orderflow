@@ -1,5 +1,5 @@
 import { userManager } from './auth'
-import type { Order, OrderLine, TimelineStep } from './types'
+import type { Order, Product, TimelineStep } from './types'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
 
@@ -14,7 +14,9 @@ export class ApiError extends Error {
         ? 'errors.rateLimited'
         : status === 401
           ? 'errors.unauthorized'
-          : 'errors.generic'
+          : status === 403
+            ? 'errors.forbidden'
+            : 'errors.generic'
     super(key)
     this.key = key
   }
@@ -37,11 +39,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await res.json()) as T
 }
 
+export const listProducts = (lang: string) => request<Product[]>(`/api/products?lang=${encodeURIComponent(lang)}`)
+
 export const listOrders = () => request<Order[]>('/api/orders')
 export const getTimeline = (id: string) => request<TimelineStep[]>(`/api/orders/${id}/timeline`)
-export const submitOrder = (lines: OrderLine[]) =>
+export const returnOrder = (id: string) => request<Order>(`/api/orders/${id}/return`, { method: 'POST' })
+
+export const submitOrder = (lines: { sku: string; quantity: number }[]) =>
   request<Order>('/api/orders', {
     method: 'POST',
     headers: { 'Idempotency-Key': crypto.randomUUID() },
     body: JSON.stringify({ lines }),
   })
+
+export const adminListOrders = () => request<Order[]>('/api/admin/orders')
+export const adminShip = (id: string) => request<Order>(`/api/admin/orders/${id}/ship`, { method: 'POST' })
+export const adminRefund = (id: string) =>
+  request<{ id: string }>(`/api/admin/orders/${id}/refund`, { method: 'POST', body: JSON.stringify({ reason: 'admin refund' }) })

@@ -6,12 +6,14 @@ using Orderflow.Contracts;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddOrderflowTelemetry("payments");
 
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<PaymentsDbContext>(o =>
     o.UseNpgsql(builder.Configuration.GetConnectionString("Payments")));
 
 builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<ProcessPaymentConsumer>();
+    x.AddConsumer<RefundPaymentConsumer>();
 
     x.AddEntityFrameworkOutbox<PaymentsDbContext>(o =>
     {
@@ -51,6 +53,8 @@ public class Payment
     public decimal Amount { get; set; }
     public bool Succeeded { get; set; }
     public string? FailureReason { get; set; }
+    public decimal? RefundedAmount { get; set; }
+    public DateTimeOffset? RefundedAt { get; set; }
 }
 
 public class PaymentsDbContext(DbContextOptions<PaymentsDbContext> options) : DbContext(options)
@@ -65,6 +69,7 @@ public class PaymentsDbContext(DbContextOptions<PaymentsDbContext> options) : Db
             e.ToTable("payments");
             e.HasKey(p => p.OrderId);
             e.Property(p => p.Amount).HasPrecision(18, 2);
+            e.Property(p => p.RefundedAmount).HasPrecision(18, 2);
         });
         b.AddInboxStateEntity();
         b.AddOutboxMessageEntity();
@@ -103,6 +108,31 @@ public class ProcessPaymentConsumer(PaymentsDbContext db, IConfiguration config)
         else
             await context.Publish(new PaymentFailed(msg.OrderId, payment.FailureReason!));
 
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+}
+
+
+/// <summary>
+/// Mock refund: money goes back to the original payment, once. Idempotent per order: a redelivered
+/// command repeats the stored result instead of refunding twice.
+/// </summary>
+public class RefundPaymentConsumer(PaymentsDbContext db, TimeProvider clock) : IConsumer<RefundPayment>
+{
+    public async Task Consume(ConsumeContext<RefundPayment> context)
+    {
+        var msg = context.Message;
+        var payment = await db.Payments.FindAsync([msg.OrderId], context.CancellationToken);
+        if (payment is not { Succeeded: true })
+            throw new InvalidOperationException($"Order {msg.OrderId} has no completed payment to refund.");
+
+        if (payment.RefundedAmount is null)
+        {
+            payment.RefundedAmount = Math.Min(msg.Amount, payment.Amount);
+            payment.RefundedAt = clock.GetUtcNow();
+        }
+
+        await context.Publish(new PaymentRefunded(msg.OrderId, payment.RefundedAmount.Value, msg.Reason));
         await db.SaveChangesAsync(context.CancellationToken);
     }
 }

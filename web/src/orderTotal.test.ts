@@ -1,25 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { isValidLine, orderTotal } from './orderTotal'
+import { formatMoney, isValidQuantity, orderTotal } from './orderTotal'
 
 describe('orderTotal', () => {
   it('sums quantity times price', () => {
     expect(
       orderTotal([
-        { sku: 'A', quantity: 2, unitPrice: 10 },
-        { sku: 'B', quantity: 1, unitPrice: 5.5 },
+        { quantity: 2, unitPrice: 10 },
+        { quantity: 1, unitPrice: 5.5 },
       ]),
     ).toBe(25.5)
   })
+
+  it('is zero for an empty cart', () => {
+    expect(orderTotal([])).toBe(0)
+  })
 })
 
-describe('isValidLine', () => {
+describe('isValidQuantity', () => {
   it.each([
-    [{ sku: '', quantity: 1, unitPrice: 1 }, false],
-    [{ sku: 'A', quantity: 0, unitPrice: 1 }, false],
-    [{ sku: 'A', quantity: 1.5, unitPrice: 1 }, false],
-    [{ sku: 'A', quantity: 1, unitPrice: -1 }, false],
-    [{ sku: 'A', quantity: 1, unitPrice: 0 }, true],
-  ])('%j -> %s', (line, expected) => {
-    expect(isValidLine(line)).toBe(expected)
+    [0, false],
+    [-1, false],
+    [1.5, false],
+    [1, true],
+    [12, true],
+  ])('%s -> %s', (quantity, expected) => {
+    expect(isValidQuantity(quantity)).toBe(expected)
+  })
+})
+
+describe('formatMoney', () => {
+  it('formats with the currency', () => {
+    expect(formatMoney(25, 'USD', 'en')).toBe('$25.00')
   })
 })
