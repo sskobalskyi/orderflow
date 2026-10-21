@@ -28,7 +28,14 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Runtime majors are deliberate upgrades: the projects target .NET 9 and Node 24.
+    ignore:
+      - dependency-name: "dotnet/*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /web
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
