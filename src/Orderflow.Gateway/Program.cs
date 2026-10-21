@@ -22,9 +22,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = auth["Issuer"],
             ValidateAudience = false,
             NameClaimType = "preferred_username",
+            RoleClaimType = "roles", // flattened realm roles, see the Keycloak realm mapper
         };
     });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(o => o.AddPolicy("admin", p => p.RequireRole("admin")));
 
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [])

@@ -14,3 +14,7 @@ public record PaymentFailed(Guid OrderId, string Reason);
 // Final outcomes published by the saga.
 public record OrderConfirmed(Guid OrderId);
 public record OrderRejected(Guid OrderId, string Reason);
+
+// Refund of a paid order, requested by Orders and carried out by Payments.
+public record RefundPayment(Guid OrderId, decimal Amount, string Reason);
+public record PaymentRefunded(Guid OrderId, decimal Amount, string Reason);

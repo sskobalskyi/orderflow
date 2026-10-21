@@ -22,3 +22,4 @@ services:
   payments: { environment: *otel, depends_on: [aspire-dashboard] }
   inventory: { environment: *otel, depends_on: [aspire-dashboard] }
   notifications: { environment: *otel, depends_on: [aspire-dashboard] }
+  catalog: { environment: *otel, depends_on: [aspire-dashboard] }

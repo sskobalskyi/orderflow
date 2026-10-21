@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="10.1.0" />
+    <PackageReference Include="JsonSchema.Net" Version="9.4.1" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.*" />
@@ -16,6 +17,7 @@
     <PackageReference Include="Testcontainers.Redis" Version="4.*" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,6 +31,11 @@
     <ProjectReference Include="../../src/Orderflow.Payments/Orderflow.Payments.csproj" Aliases="PaymentsApp" />
     <ProjectReference Include="../../src/Orderflow.Inventory/Orderflow.Inventory.csproj" Aliases="InventoryApp" />
     <ProjectReference Include="../../src/Orderflow.Notifications/Orderflow.Notifications.csproj" Aliases="NotificationsApp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="../../contracts/integration-events.yaml" Link="contracts/integration-events.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="../../src/Orderflow.Catalog/Orderflow.Catalog.csproj" Aliases="CatalogApp" />
   </ItemGroup>
 
 </Project>

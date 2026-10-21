@@ -3,6 +3,7 @@
   "enabled": true,
   "sslRequired": "none",
   "registrationAllowed": false,
+  "roles": { "realm": [ { "name": "admin", "description": "Shop administrator: ships and refunds orders, edits the catalog" } ] },
   "loginWithEmailAllowed": true,
   "clients": [
     {
@@ -14,10 +15,35 @@
       "directAccessGrantsEnabled": true,
       "redirectUris": [ "http://localhost:5173/*" ],
       "webOrigins": [ "http://localhost:5173" ],
-      "attributes": { "pkce.code.challenge.method": "S256" }
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "users": [
+    {
+      "username": "admin",
+      "email": "admin@orderflow.local",
+      "firstName": "Shop",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": [ "admin" ],
+      "credentials": [ { "type": "password", "value": "admin", "temporary": false } ]
+    },
     {
       "username": "demo",
       "email": "demo@orderflow.local",

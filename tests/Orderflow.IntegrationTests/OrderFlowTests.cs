@@ -9,11 +9,11 @@ public class OrderFlowTests(StackFixture stack)
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
-    private static HttpRequestMessage Submit(Guid customer, string sku, int quantity, decimal price, string? idempotencyKey = null)
+    private static HttpRequestMessage Submit(Guid customer, string sku, int quantity, string? idempotencyKey = null)
     {
         var req = new HttpRequestMessage(HttpMethod.Post, "/orders")
         {
-            Content = JsonContent.Create(new { lines = new[] { new { sku, quantity, unitPrice = price } } }),
+            Content = JsonContent.Create(new { lines = new[] { new { sku, quantity } } }),
         };
         req.Headers.Add("X-Customer-Id", customer.ToString());
         if (idempotencyKey is not null) req.Headers.Add("Idempotency-Key", idempotencyKey);
@@ -27,9 +27,9 @@ public class OrderFlowTests(StackFixture stack)
         return req;
     }
 
-    private async Task<JsonElement> PlaceOrder(Guid customer, string sku, int quantity, decimal price, string? key = null)
+    private async Task<JsonElement> PlaceOrder(Guid customer, string sku, int quantity, string? key = null)
     {
-        var res = await stack.Orders.SendAsync(Submit(customer, sku, quantity, price, key));
+        var res = await stack.Orders.SendAsync(Submit(customer, sku, quantity, key));
         res.EnsureSuccessStatusCode();
         return await res.Content.ReadFromJsonAsync<JsonElement>();
     }
@@ -73,17 +73,20 @@ public class OrderFlowTests(StackFixture stack)
     }
 
     [Fact]
-    public async Task Order_is_confirmed_and_stock_is_reserved()
+    public async Task Order_is_priced_by_the_catalog_confirmed_and_stock_is_reserved()
     {
         var customer = Guid.NewGuid();
-        var before = await SettledAvailable("A");
+        var before = await SettledAvailable("LAMP-01");
 
-        var created = await PlaceOrder(customer, "A", 2, 10m);
+        var created = await PlaceOrder(customer, "LAMP-01", 2);
         var id = created.GetProperty("id").GetGuid();
+        Assert.Equal(50m, created.GetProperty("total").GetDecimal());
+        Assert.Equal("USD", created.GetProperty("currency").GetString());
+
         var order = await WaitForFinalStatus(customer, id);
 
         Assert.Equal("Confirmed", order.GetProperty("status").GetString());
-        Assert.Equal(before - 2, await Available("A"));
+        Assert.Equal(before - 2, await Available("LAMP-01"));
         Assert.Contains("Confirmed", await Steps(customer, id));
     }
 
@@ -91,9 +94,9 @@ public class OrderFlowTests(StackFixture stack)
     public async Task Declined_payment_rejects_the_order_and_releases_stock()
     {
         var customer = Guid.NewGuid();
-        var before = await SettledAvailable("B");
+        var before = await SettledAvailable("DESK-01");
 
-        var created = await PlaceOrder(customer, "B", 1, 5000m);
+        var created = await PlaceOrder(customer, "DESK-01", 1);
         var id = created.GetProperty("id").GetGuid();
         var order = await WaitForFinalStatus(customer, id);
 
@@ -102,14 +105,14 @@ public class OrderFlowTests(StackFixture stack)
         Assert.Equal(["Submitted", "StockReserved", "PaymentFailed", "Rejected"], await Steps(customer, id));
 
         // The compensation arrives asynchronously after the order is already rejected.
-        await Eventually(async () => await Available("B") == before);
+        await Eventually(async () => await Available("DESK-01") == before);
     }
 
     [Fact]
     public async Task Insufficient_stock_rejects_without_charging()
     {
         var customer = Guid.NewGuid();
-        var created = await PlaceOrder(customer, "C", 999, 1m);
+        var created = await PlaceOrder(customer, "MUG-01", 999);
         var id = created.GetProperty("id").GetGuid();
         var order = await WaitForFinalStatus(customer, id);
 
@@ -123,8 +126,8 @@ public class OrderFlowTests(StackFixture stack)
         var customer = Guid.NewGuid();
         var key = Guid.NewGuid().ToString();
 
-        var first = await PlaceOrder(customer, "A", 1, 1m, key);
-        var second = await PlaceOrder(customer, "A", 1, 1m, key);
+        var first = await PlaceOrder(customer, "MUG-01", 1, key);
+        var second = await PlaceOrder(customer, "MUG-01", 1, key);
 
         Assert.Equal(first.GetProperty("id").GetGuid(), second.GetProperty("id").GetGuid());
         var list = await (await stack.Orders.SendAsync(Get(customer, "/orders"))).Content.ReadFromJsonAsync<JsonElement>();
@@ -135,7 +138,7 @@ public class OrderFlowTests(StackFixture stack)
     public async Task Customers_cannot_see_each_others_orders()
     {
         var owner = Guid.NewGuid();
-        var created = await PlaceOrder(owner, "A", 1, 1m);
+        var created = await PlaceOrder(owner, "MUG-01", 1);
         var id = created.GetProperty("id").GetGuid();
 
         var res = await stack.Orders.SendAsync(Get(Guid.NewGuid(), $"/orders/{id}"));
@@ -162,10 +165,45 @@ public class OrderFlowTests(StackFixture stack)
     }
 
     [Fact]
+    public async Task Unknown_product_is_rejected_with_a_code()
+    {
+        var res = await stack.Orders.SendAsync(Submit(Guid.NewGuid(), "NO-SUCH-SKU", 1));
+
+        Assert.Equal((HttpStatusCode)422, res.StatusCode);
+        Assert.Equal("order_unknown_product", (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Catalog_lists_products_in_the_requested_language()
+    {
+        var en = await stack.Catalog.GetFromJsonAsync<JsonElement>("/products?lang=en");
+        var uk = await stack.Catalog.GetFromJsonAsync<JsonElement>("/products?lang=uk");
+
+        Assert.Equal("Desk lamp", en.EnumerateArray().First(p => p.GetProperty("sku").GetString() == "LAMP-01").GetProperty("name").GetString());
+        Assert.Equal("Настільна лампа", uk.EnumerateArray().First(p => p.GetProperty("sku").GetString() == "LAMP-01").GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task Catalog_can_be_extended_and_a_new_product_can_be_ordered()
+    {
+        var sku = $"NEW-{Guid.NewGuid():N}"[..12];
+        var put = await stack.Catalog.PutAsJsonAsync($"/admin/products/{sku}", new
+        {
+            price = 3.0m, currency = "USD", active = true,
+            translations = new Dictionary<string, object> { ["en"] = new { name = "Sticker", description = "A sticker" } },
+        });
+        put.EnsureSuccessStatusCode();
+
+        var res = await stack.Orders.SendAsync(Submit(Guid.NewGuid(), sku, 1));
+
+        Assert.Equal(HttpStatusCode.Created, res.StatusCode);
+    }
+
+    [Fact]
     public async Task Customer_is_notified_once_per_outcome()
     {
         var customer = Guid.NewGuid();
-        var created = await PlaceOrder(customer, "A", 1, 1m);
+        var created = await PlaceOrder(customer, "MUG-01", 1);
         var id = created.GetProperty("id").GetGuid();
         await WaitForFinalStatus(customer, id);
 
