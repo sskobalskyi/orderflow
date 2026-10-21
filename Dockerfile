@@ -9,7 +9,7 @@ RUN dotnet restore src/Orderflow.${SERVICE}
 COPY src src
 RUN dotnet publish src/Orderflow.${SERVICE} -c Release -o /app --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:9.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 ARG SERVICE
 WORKDIR /app
 COPY --from=build /app .
