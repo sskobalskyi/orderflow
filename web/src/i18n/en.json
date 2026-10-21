@@ -1,22 +1,39 @@
 {
   "app": { "title": "Orderflow", "language": "Language" },
-  "auth": { "signIn": "Sign in", "signOut": "Sign out", "signedInAs": "Signed in as {{name}}", "welcome": "Sign in to place and track orders." },
-  "form": {
-    "title": "New order",
-    "sku": "SKU",
-    "quantity": "Quantity",
-    "unitPrice": "Unit price",
-    "addLine": "Add line",
-    "removeLine": "Remove",
+  "auth": { "signIn": "Sign in", "signOut": "Sign out", "signedInAs": "Signed in as {{name}}", "welcome": "Sign in to shop and track your orders." },
+  "tabs": { "shop": "Shop", "orders": "My orders", "admin": "Admin" },
+  "shop": {
+    "title": "Shop",
+    "empty": "The catalog is empty.",
+    "quantity": "Quantity for {{name}}",
+    "cart": "Your order",
+    "cartEmpty": "Choose a quantity for at least one product.",
     "total": "Total: {{total}}",
     "submit": "Place order",
     "submitting": "Placing order…",
-    "hint": "Demo stock: A (100), B (50), C (5). Orders above 1000 are declined by Payments."
+    "hint": "Demo: Payments declines orders above 1000, and the standing desk has only 5 in stock."
   },
-  "orders": { "title": "Your orders", "empty": "No orders yet.", "created": "Created", "total": "Total", "status": "Status", "select": "Select an order to see its saga timeline.", "loading": "Loading…" },
-  "status": { "Submitted": "Submitted", "Confirmed": "Confirmed", "Rejected": "Rejected" },
+  "orders": {
+    "title": "My orders",
+    "empty": "No orders yet.",
+    "created": "Created",
+    "items": "Items",
+    "total": "Total",
+    "status": "Status",
+    "select": "Select an order to see its timeline.",
+    "loading": "Loading…",
+    "return": "Return"
+  },
+  "status": {
+    "Submitted": "Submitted",
+    "Confirmed": "Confirmed",
+    "Rejected": "Rejected",
+    "Shipped": "Shipped",
+    "Returned": "Returned",
+    "Refunded": "Refunded"
+  },
   "timeline": {
-    "title": "Saga timeline",
+    "title": "Order timeline",
     "steps": {
       "Submitted": "Order submitted",
       "StockReserved": "Stock reserved",
@@ -24,8 +41,18 @@
       "PaymentCompleted": "Payment completed",
       "PaymentFailed": "Payment failed",
       "Confirmed": "Order confirmed",
-      "Rejected": "Order rejected"
+      "Rejected": "Order rejected",
+      "Shipped": "Order shipped",
+      "Returned": "Return registered",
+      "Refunded": "Refund issued"
     }
+  },
+  "admin": {
+    "title": "All orders",
+    "customer": "Customer",
+    "ship": "Mark shipped",
+    "refund": "Refund",
+    "empty": "No orders yet."
   },
   "reasons": {
     "cardDeclined": "Card declined: the amount exceeds {{limit}}.",
@@ -35,7 +62,15 @@
     "generic": "Something went wrong. Please try again.",
     "rateLimited": "Too many requests. Please wait a moment.",
     "unauthorized": "Your session has expired. Please sign in again.",
+    "forbidden": "You are not allowed to do this.",
     "order_empty": "An order needs at least one line.",
-    "order_invalid_line": "Every line needs a SKU, a positive quantity and a non-negative price."
+    "order_invalid_line": "Every line needs a product and a positive quantity.",
+    "order_unknown_product": "One of the products is no longer available.",
+    "order_mixed_currency": "All products in an order must use the same currency.",
+    "order_not_shippable": "Only a confirmed order can be shipped.",
+    "order_not_returnable": "Only a shipped order can be returned.",
+    "order_not_refundable": "Only a paid order can be refunded.",
+    "order_already_refunded": "This order was already refunded.",
+    "refund_invalid_amount": "The refund must be positive and at most the order total."
   }
 }

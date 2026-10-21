@@ -1,4 +1,4 @@
-export type OrderStatus = 'Submitted' | 'Confirmed' | 'Rejected'
+export type OrderStatus = 'Submitted' | 'Confirmed' | 'Rejected' | 'Shipped' | 'Returned' | 'Refunded'
 
 export interface OrderLine {
   sku: string
@@ -10,9 +10,18 @@ export interface Order {
   id: string
   status: OrderStatus
   rejectionReason: string | null
+  currency: string
   createdAt: string
   lines: OrderLine[]
   total: number
+}
+
+export interface Product {
+  sku: string
+  name: string
+  description: string
+  price: number
+  currency: string
 }
 
 export interface TimelineStep {

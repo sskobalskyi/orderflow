@@ -1,48 +1,63 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getTimeline } from '../api'
-import { parseReason } from '../reason'
+import { getTimeline } from '@/api'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { parseReason } from '@/reason'
+import { cn } from '@/lib/utils'
 
-const TERMINAL = new Set(['Confirmed', 'Rejected'])
-const FAILED = new Set(['StockRejected', 'PaymentFailed', 'Rejected'])
+// The saga is over at these steps; shipping, returns and refunds can still follow, so keep a slow poll after.
+const SAGA_DONE = new Set(['Confirmed', 'Rejected'])
+const FAILED = new Set(['StockRejected', 'PaymentFailed', 'Rejected', 'Returned'])
 
 export function Timeline({ orderId }: { orderId: string | null }) {
   const { t, i18n } = useTranslation()
+  const queryClient = useQueryClient()
   const reasonText = (detail: string) => {
     const parsed = parseReason(detail)
     return parsed ? t(parsed.key, parsed.values) : detail
   }
-  const queryClient = useQueryClient()
+
   const { data } = useQuery({
     queryKey: ['timeline', orderId],
     queryFn: () => getTimeline(orderId!),
     enabled: orderId !== null,
-    refetchInterval: (q) => (q.state.data?.some((s) => TERMINAL.has(s.step)) ? false : 1000),
+    refetchInterval: (q) => (q.state.data?.some((s) => SAGA_DONE.has(s.step)) ? 4000 : 1000),
   })
 
-  // The order list reads a different endpoint, so refresh it the moment the saga reaches its outcome.
-  const finished = data?.some((s) => TERMINAL.has(s.step)) ?? false
+  // The order list reads a different endpoint, so refresh it whenever the timeline gains a step.
+  const steps = data?.length ?? 0
   useEffect(() => {
-    if (finished) void queryClient.invalidateQueries({ queryKey: ['orders'] })
-  }, [finished, queryClient])
+    if (steps > 0) void queryClient.invalidateQueries({ queryKey: ['orders'] })
+  }, [steps, queryClient])
 
   return (
-    <section className="card timeline">
-      <h2>{t('timeline.title')}</h2>
-      {!orderId ? (
-        <p>{t('orders.select')}</p>
-      ) : (
-        <ol>
-          {data?.map((s) => (
-            <li key={s.step} className={FAILED.has(s.step) ? 'failed' : 'ok'}>
-              <strong>{t(`timeline.steps.${s.step}`, { defaultValue: s.step })}</strong>
-              <time>{new Date(s.at).toLocaleTimeString(i18n.language)}</time>
-              {s.detail && <small>{reasonText(s.detail)}</small>}
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
+    <Card data-testid="timeline">
+      <CardHeader>
+        <CardTitle>{t('timeline.title')}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {!orderId ? (
+          <p className="text-muted-foreground">{t('orders.select')}</p>
+        ) : (
+          <ol className="ml-2 border-l-2 border-border">
+            {data?.map((s) => (
+              <li
+                key={s.step}
+                data-failed={FAILED.has(s.step)}
+                className={cn(
+                  'relative grid gap-0.5 py-1 pb-3 pl-4 before:absolute before:top-2.5 before:-left-[7px] before:size-3 before:rounded-full before:bg-success before:content-[""]',
+                  FAILED.has(s.step) && 'before:bg-destructive',
+                )}
+              >
+                <strong>{t(`timeline.steps.${s.step}`, { defaultValue: s.step })}</strong>
+                <time className="text-xs text-muted-foreground">{new Date(s.at).toLocaleTimeString(i18n.language)}</time>
+                {s.detail && <small className="text-xs text-muted-foreground">{reasonText(s.detail)}</small>}
+              </li>
+            ))}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
   )
 }

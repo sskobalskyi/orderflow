@@ -14,9 +14,12 @@ Event-driven order processing built from small .NET services coordinated by a sa
 - **CQRS read model:** every saga step is projected into a timeline the UI queries without touching the saga.
 - **API gateway and OIDC:** YARP validates Keycloak JWTs, rate-limits per user and sets the caller identity; services scope all data to it ([ADR 0003](docs/adr/0003-gateway-terminates-auth.md)).
 - **Resilience:** exponential retries, `*_error` queues, a replay script, `Idempotency-Key` on order creation backed by Redis, late and duplicate replies ignored by the saga.
-- **Database per service:** Orders, Payments, Inventory and Notifications each own a database, with EF Core migrations applied on startup.
+- **Database per service:** Orders, Payments, Inventory, Notifications and Catalog each own a database, with EF Core migrations applied on startup.
+- **Marketplace base, deliberately generic:** an i18n product catalog (data-driven, swap `products.json` to sell something else), shipping, returns and partial or full refunds that go through Payments. Nothing in it knows what is being sold.
+- **Versioned integration events:** `order.confirmed.v1`, `order.shipped.v1`, `order.returned.v1` and `order.refunded.v1` go to the topic exchange `integration.events` as raw JSON with `messageId`, `occurredAt`, `schemaVersion` and `traceparent` headers, through their own transactional outbox. They are a wire contract, separate from the internal saga messages ([ADR 0005](docs/adr/0005-integration-events.md)).
 - **Observability:** OpenTelemetry traces, metrics and logs from every service. One order is one trace from the gateway through RabbitMQ to all services, plus a saga dashboard.
-- **i18n:** the UI is `en` (default) and `uk`; API errors carry stable codes that the UI translates.
+- **i18n:** the UI is `en` (default) and `uk`, product names and descriptions included; API errors carry stable codes that the UI translates.
+- **UI:** React, Tailwind CSS v4 and shadcn/ui, with a shop, order tracking and an admin tab.
 - **Tests:** xUnit for the domain and saga, Testcontainers integration tests against real PostgreSQL, RabbitMQ and Redis, Playwright E2E through the browser and Keycloak login.
 
 ## Architecture
@@ -90,16 +93,17 @@ docker compose up --build
 | API gateway | http://localhost:8080 |
 | Keycloak | http://localhost:8180 (`admin` / `admin`) |
 | RabbitMQ UI | http://localhost:15672 (`guest` / `guest`) |
+| Catalog | http://localhost:8084/products |
 | Stock levels | http://localhost:8082/stock |
 | Notifications | http://localhost:8083/notifications |
 
-Demo stock is A=100, B=50, C=5, and Payments declines totals above 1000:
+Demo catalog: `LAMP-01` ($25, 100 in stock), `MUG-01` ($12.50, 50) and `DESK-01` ($1200, 5). Payments declines totals above 1000. Sign in as `admin` / `admin` to ship and refund orders.
 
 | Order | Outcome |
 | --- | --- |
-| 2 x A at 10 | `Confirmed` |
-| 1 x B at 5000 | `Rejected` (card declined), stock for B released |
-| 9 x C | `Rejected` (insufficient stock) |
+| 2 x `LAMP-01` | `Confirmed` |
+| 1 x `DESK-01` ($1200) | `Rejected` (card declined), stock released |
+| 6 x `DESK-01` | `Rejected` (insufficient stock) |
 
 Call the API directly:
 
@@ -107,10 +111,31 @@ Call the API directly:
 $token = (curl.exe -s -X POST http://localhost:8180/realms/orderflow/protocol/openid-connect/token `
   -d client_id=orderflow-web -d grant_type=password -d username=demo -d password=demo | ConvertFrom-Json).access_token
 curl.exe -X POST http://localhost:8080/api/orders -H "Authorization: Bearer $token" -H "content-type: application/json" `
-  -H "Idempotency-Key: $(New-Guid)" -d "{\"lines\":[{\"sku\":\"A\",\"quantity\":2,\"unitPrice\":10}]}"
+  -H "Idempotency-Key: $(New-Guid)" -d "{\"lines\":[{\"sku\":\"LAMP-01\",\"quantity\":2}]}"
 ```
 
-Endpoints (all behind the gateway under `/api`): `POST /orders`, `GET /orders`, `GET /orders/{id}`, `GET /orders/{id}/timeline`.
+Endpoints, all behind the gateway under `/api`. Prices always come from the catalog, never from the request.
+
+| Endpoint | Who | Purpose |
+| --- | --- | --- |
+| `GET /products?lang=uk` | anyone | Catalog in a language (falls back to English) |
+| `POST /orders`, `GET /orders`, `GET /orders/{id}`, `GET /orders/{id}/timeline` | signed in | Place and track your orders |
+| `POST /orders/{id}/return` | the order's owner | Return a shipped order |
+| `GET /admin/orders`, `POST /admin/orders/{id}/ship`, `POST /admin/orders/{id}/refund` | `admin` role | Fulfilment and refunds (`{"amount": 10, "reason": "..."}` is optional) |
+| `PUT /admin/products/{sku}` | `admin` role | Add or change a product |
+
+An order moves `Submitted` to `Confirmed` (or `Rejected`), then `Shipped`, `Returned` and `Refunded`. A refund can also follow a confirmed order, which acts as a cancellation.
+
+## Integration events
+
+Other systems consume four events from the topic exchange `integration.events`, with the event name as routing key. Every message is raw JSON, carries the AMQP headers `messageId`, `occurredAt`, `schemaVersion` and `traceparent`, and is delivered at least once, so consumers deduplicate on `messageId`. The schemas live in [`contracts/integration-events.yaml`](contracts/integration-events.yaml), a vendored copy of the AsyncAPI document owned by the Greenhaus repo, and the integration tests validate every published message against it.
+
+| Routing key | Published when |
+| --- | --- |
+| `order.confirmed.v1` | the saga confirms an order (customer, lines, total, currency) |
+| `order.shipped.v1` | an admin marks the order shipped |
+| `order.returned.v1` | the customer returns a shipped order |
+| `order.refunded.v1` | Payments confirmed a refund (amount, currency, reason) |
 
 ## Tests
 
@@ -120,9 +145,9 @@ cd web; npm test; npm run lint    # unit tests and lint for the UI
 docker compose up -d --build; cd web; npm run e2e   # Playwright against the full stack
 ```
 
-- `tests/Orderflow.Orders.Tests`: domain rules and the saga state machine (MassTransit test harness), including duplicate replies.
-- `tests/Orderflow.IntegrationTests`: real PostgreSQL, RabbitMQ and Redis with the four services in-process. Covers the happy path, compensation, out-of-stock, idempotency, customer isolation, error codes and notifications.
-- `web/e2e`: Keycloak login, order, saga timeline, customer isolation, `uk` locale. The screenshots in this README come from this suite.
+- `tests/Orderflow.Orders.Tests`: domain rules (including the shipping, return and refund transitions) and the saga state machine (MassTransit test harness), including duplicate replies.
+- `tests/Orderflow.IntegrationTests`: real PostgreSQL, RabbitMQ and Redis with the five services in-process. Covers the happy path, catalog pricing, compensation, out-of-stock, idempotency, customer isolation, error codes, notifications, and the whole shipping, return and refund lifecycle. A raw AMQP listener, standing in for an outside consumer, validates each published integration event and its headers against the AsyncAPI contract, plus a test that proves the validator fails on a broken payload.
+- `web/e2e`: Keycloak login, ordering, the saga timeline, customer isolation, `uk` locale, and the admin flow across two browsers (ship, return, refund). The screenshots in this README come from this suite.
 
 ## Observability
 
@@ -164,14 +189,16 @@ src/Orderflow.Orders          order aggregate, saga, read model, HTTP API
 src/Orderflow.Payments        payment consumer (mock gateway)
 src/Orderflow.Inventory       stock and reservations
 src/Orderflow.Notifications   customer messages
+src/Orderflow.Catalog         i18n product catalog (data-driven seed)
 web/                          React + TypeScript UI, Playwright E2E
-keycloak/                     imported realm with demo users
+keycloak/                     imported realm with demo users and an admin role
+contracts/                    vendored AsyncAPI contract for the integration events
 docs/                         ADRs, Grafana dashboard, images
 ```
 
 ## Known limits
 
-This is a local-first demo, not a production template. Migrations run on startup instead of through a bundle, the Keycloak realm uses `start-dev`, services trust the gateway on the internal network, and the payment provider is a mock with a fixed limit.
+This is a local-first demo, not a production template. Orderflow does not consume `device.claimed.v1` yet, returned goods are not restocked, an order can be refunded once, and migrations run on startup instead of through a bundle, the Keycloak realm uses `start-dev`, services trust the gateway on the internal network, and the payment provider is a mock with a fixed limit.
 
 ## License
 
