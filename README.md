@@ -1,25 +1,84 @@
 # Orderflow
 
-Event-driven order processing built from small .NET services coordinated by a saga. A portfolio project showing microservices, the transactional outbox, CQRS, an API gateway and OIDC, all running locally in Docker.
+[![CI](https://github.com/sskobalskyi/orderflow/actions/workflows/ci.yml/badge.svg)](https://github.com/sskobalskyi/orderflow/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/sskobalskyi/orderflow/actions/workflows/codeql.yml/badge.svg)](https://github.com/sskobalskyi/orderflow/actions/workflows/codeql.yml)
 
-> Status: early. Orders, Payments and Inventory run an orchestrated saga with compensation; the React UI is in; integration and E2E tests are next.
+Event-driven order processing built from small .NET services coordinated by a saga. A customer signs in, places an order, and watches it move through stock reservation and payment, or get compensated when something fails. Everything runs locally with one `docker compose up`.
 
-## Architecture (target)
+![Orderflow UI in Ukrainian](web/e2e/screenshots/orders-uk.png)
+
+## What it demonstrates
+
+- **Orchestrated saga with compensation:** a MassTransit state machine reserves stock, takes payment and confirms the order. A declined payment releases the stock and rejects the order ([ADR 0002](docs/adr/0002-orchestrated-saga.md)).
+- **Transactional outbox and inbox:** state changes and the messages announcing them commit together (EF Core on PostgreSQL), on the HTTP side and inside consumers and the saga. Consumers are idempotent ([ADR 0001](docs/adr/0001-outbox-before-saga.md), [ADR 0004](docs/adr/0004-opentelemetry-and-consumer-outbox.md)).
+- **CQRS read model:** every saga step is projected into a timeline the UI queries without touching the saga.
+- **API gateway and OIDC:** YARP validates Keycloak JWTs, rate-limits per user and sets the caller identity; services scope all data to it ([ADR 0003](docs/adr/0003-gateway-terminates-auth.md)).
+- **Resilience:** exponential retries, `*_error` queues, a replay script, `Idempotency-Key` on order creation backed by Redis, late and duplicate replies ignored by the saga.
+- **Database per service:** Orders, Payments, Inventory and Notifications each own a database, with EF Core migrations applied on startup.
+- **Observability:** OpenTelemetry traces, metrics and logs from every service. One order is one trace from the gateway through RabbitMQ to all services, plus a saga dashboard.
+- **i18n:** the UI is `en` (default) and `uk`; API errors carry stable codes that the UI translates.
+- **Tests:** xUnit for the domain and saga, Testcontainers integration tests against real PostgreSQL, RabbitMQ and Redis, Playwright E2E through the browser and Keycloak login.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    UI[React UI] --> GW[YARP gateway]
-    GW --> Orders
-    Orders -- OrderSubmitted --> MQ[(RabbitMQ)]
-    MQ --> Saga[Order saga]
-    Saga --> Payments
-    Saga --> Inventory
-    Saga --> Notifications
-    Orders & Payments & Inventory --> PG[(PostgreSQL, schema per service)]
-    GW -. JWT .- KC[Keycloak]
+    User((Customer)) --> Web[React UI<br/>Vite, TanStack Query]
+    Web -->|OIDC code + PKCE| KC[Keycloak]
+    Web -->|JWT| GW[YARP gateway<br/>auth, rate limit]
+    GW -->|X-Customer-Id| Orders
+
+    subgraph Services
+        Orders[Orders<br/>aggregate, saga, read model]
+        Payments
+        Inventory
+        Notifications
+    end
+
+    Orders <-->|commands and replies| MQ[(RabbitMQ)]
+    Payments <--> MQ
+    Inventory <--> MQ
+    Notifications <--> MQ
+
+    Orders --- DB1[(orders db)]
+    Payments --- DB2[(payments db)]
+    Inventory --- DB3[(inventory db)]
+    Notifications --- DB4[(notifications db)]
+    Orders --- Redis[(Redis<br/>idempotency keys)]
+
+    Services -. OTLP .-> OBS[Observatory / Aspire]
+    GW -. OTLP .-> OBS
 ```
 
-## Run
+### One order, end to end
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant O as Orders (saga)
+    participant I as Inventory
+    participant P as Payments
+    participant N as Notifications
+    C->>O: POST /orders (via gateway)
+    O->>O: save order + outbox (one transaction)
+    O->>I: ReserveStock
+    I-->>O: StockReserved (or StockRejected)
+    O->>P: ProcessPayment
+    alt payment completed
+        P-->>O: PaymentCompleted
+        O->>N: OrderConfirmed
+    else payment declined
+        P-->>O: PaymentFailed
+        O->>I: ReleaseStock (compensation)
+        O->>N: OrderRejected
+    end
+```
+
+![Saga timeline](web/e2e/screenshots/orders-en.png)
+
+## Run it
+
+Requirements: Docker. Everything runs locally.
 
 ```powershell
 docker compose up --build
@@ -27,41 +86,14 @@ docker compose up --build
 
 | Service | URL |
 | --- | --- |
-| Web UI | http://localhost:5173 (sign in as demo / demo or alice / alice) |
+| Web UI | http://localhost:5173 (sign in as `demo` / `demo` or `alice` / `alice`) |
 | API gateway | http://localhost:8080 |
-| Keycloak | http://localhost:8180 (admin / admin) |
-| RabbitMQ UI | http://localhost:15672 (guest / guest) |
+| Keycloak | http://localhost:8180 (`admin` / `admin`) |
+| RabbitMQ UI | http://localhost:15672 (`guest` / `guest`) |
+| Stock levels | http://localhost:8082/stock |
+| Notifications | http://localhost:8083/notifications |
 
-```powershell
-# Get a token for the demo user, then call the API through the gateway
-$token = (curl.exe -s -X POST http://localhost:8180/realms/orderflow/protocol/openid-connect/token `
-  -d client_id=orderflow-web -d grant_type=password -d username=demo -d password=demo | ConvertFrom-Json).access_token
-curl.exe -X POST http://localhost:8080/api/orders -H "Authorization: Bearer $token" -H "content-type: application/json" `
-  -d "{\"lines\":[{\"sku\":\"A\",\"quantity\":2,\"unitPrice\":10}]}"
-```
-
-## Test
-
-```powershell
-dotnet test          # unit + Testcontainers integration tests (needs Docker)
-```
-
-Decisions are recorded in [docs/adr](docs/adr).
-
-## Roadmap
-- [x] Orders service with transactional outbox
-- [x] Order saga (MassTransit state machine) with stock release on payment failure
-- [x] Payments and Inventory with outbox and idempotent consumers
-- [x] Notifications service (idempotent), failed messages land in `*_error` queues after retries
-- [x] EF Core migrations per service and `scripts/replay-errors.ps1` to replay `*_error` queues
-- [x] CQRS read model (`GET /orders/{id}/timeline`) and Redis `Idempotency-Key` on `POST /orders`
-- [x] YARP gateway (JWT, rate limiting, CORS) and Keycloak with demo users `demo` and `alice`
-- [x] React UI (Vite, TanStack Query, oidc-client-ts) with order form, list and live saga timeline, `en` / `uk`
-- [x] OpenTelemetry (traces, metrics, logs) into the Observatory stack, saga dashboard
-
-## Try the saga
-
-Seed stock: A=100, B=50, C=5. Payments declines totals above 1000.
+Demo stock is A=100, B=50, C=5, and Payments declines totals above 1000:
 
 | Order | Outcome |
 | --- | --- |
@@ -69,34 +101,74 @@ Seed stock: A=100, B=50, C=5. Payments declines totals above 1000.
 | 1 x B at 5000 | `Rejected` (card declined), stock for B released |
 | 9 x C | `Rejected` (insufficient stock) |
 
-Stock levels: http://localhost:8082/stock · Notifications: http://localhost:8083/notifications · Timeline: `GET /orders/{id}/timeline`
+Call the API directly:
+
+```powershell
+$token = (curl.exe -s -X POST http://localhost:8180/realms/orderflow/protocol/openid-connect/token `
+  -d client_id=orderflow-web -d grant_type=password -d username=demo -d password=demo | ConvertFrom-Json).access_token
+curl.exe -X POST http://localhost:8080/api/orders -H "Authorization: Bearer $token" -H "content-type: application/json" `
+  -H "Idempotency-Key: $(New-Guid)" -d "{\"lines\":[{\"sku\":\"A\",\"quantity\":2,\"unitPrice\":10}]}"
+```
+
+Endpoints (all behind the gateway under `/api`): `POST /orders`, `GET /orders`, `GET /orders/{id}`, `GET /orders/{id}/timeline`.
 
 ## Tests
-- `tests/Orderflow.Orders.Tests`: domain rules and the saga state machine (MassTransit test harness).
-- `tests/Orderflow.IntegrationTests`: real PostgreSQL, RabbitMQ and Redis via Testcontainers with the four services in-process. Covers the happy path, compensation, out-of-stock, idempotency, customer isolation and notifications.
-- `web/e2e`: Playwright against the full stack (`docker compose up -d --build`, then `cd web && npm run e2e`): Keycloak login, order, saga timeline, `uk` locale.
+
+```powershell
+dotnet test                       # unit + Testcontainers integration tests (needs Docker)
+cd web; npm test; npm run lint    # unit tests and lint for the UI
+docker compose up -d --build; cd web; npm run e2e   # Playwright against the full stack
+```
+
+- `tests/Orderflow.Orders.Tests`: domain rules and the saga state machine (MassTransit test harness), including duplicate replies.
+- `tests/Orderflow.IntegrationTests`: real PostgreSQL, RabbitMQ and Redis with the four services in-process. Covers the happy path, compensation, out-of-stock, idempotency, customer isolation, error codes and notifications.
+- `web/e2e`: Keycloak login, order, saga timeline, customer isolation, `uk` locale. The screenshots in this README come from this suite.
+
+## Observability
+
+Every service exports OpenTelemetry over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
+```powershell
+# Option A: self-contained, Aspire dashboard on http://localhost:18888
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up --build
+
+# Option B: the Observatory lab (Grafana, Tempo, Prometheus, Loki)
+(cd ../observatory; docker compose up -d)
+docker compose -f docker-compose.yml -f docker-compose.observatory.yml up --build
+```
+
+Import [`docs/grafana/orderflow-saga.json`](docs/grafana/orderflow-saga.json) into Grafana for the saga dashboard: orders per minute and outcomes, rejected share, payment and stock results, order duration percentiles, consume latency per service and recent traces.
+
+![Orderflow saga dashboard](docs/images/grafana-saga.png)
+
+The first load test through this stack found a real bug: about 6% of orders stayed in `AwaitingStock` because the saga published its command before committing its own state. The fix and the reasoning are in [ADR 0004](docs/adr/0004-opentelemetry-and-consumer-outbox.md).
 
 ## Operations
+
 Messages that still fail after retries are parked in `<queue>_error` (see the RabbitMQ UI). After fixing the cause, replay them:
 
 ```powershell
 ./scripts/replay-errors.ps1 -WhatIf   # list what would be replayed
 ./scripts/replay-errors.ps1           # move every *_error message back to its queue
 ```
+
 Each service applies its EF Core migrations on startup (`src/*/Migrations`).
 
-## Observability
-Every service exports OpenTelemetry traces, metrics and logs over OTLP. One order is one trace from the gateway through RabbitMQ to Payments, Inventory and Notifications.
+## Layout
 
-```powershell
-# Option A: self-contained, Aspire dashboard on http://localhost:18888
-docker compose -f docker-compose.yml -f docker-compose.observability.yml up --build
-
-# Option B: the Observatory lab (Grafana, Tempo, Prometheus, Loki), from the sibling ../observatory repo
-(cd ../observatory; docker compose up -d)
-docker compose -f docker-compose.yml -f docker-compose.observatory.yml up --build
+```
+src/Orderflow.Contracts       message contracts shared by services
+src/Orderflow.Observability   OpenTelemetry setup and business metrics
+src/Orderflow.Gateway         YARP gateway, JWT validation, rate limiting
+src/Orderflow.Orders          order aggregate, saga, read model, HTTP API
+src/Orderflow.Payments        payment consumer (mock gateway)
+src/Orderflow.Inventory       stock and reservations
+src/Orderflow.Notifications   customer messages
+web/                          React + TypeScript UI, Playwright E2E
+keycloak/                     imported realm with demo users
+docs/                         ADRs, Grafana dashboard, images
 ```
 
-Import `docs/grafana/orderflow-saga.json` into Grafana (Dashboards, New, Import) for the saga dashboard:
+## Known limits
 
-![Orderflow saga dashboard](docs/images/grafana-saga.png)
+This is a local-first demo, not a production template. Migrations run on startup instead of through a bundle, the Keycloak realm uses `start-dev`, services trust the gateway on the internal network, and the payment provider is a mock with a fixed limit.

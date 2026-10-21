@@ -27,6 +27,10 @@
       "Rejected": "Order rejected"
     }
   },
+  "reasons": {
+    "cardDeclined": "Card declined: the amount exceeds {{limit}}.",
+    "insufficientStock": "Not enough stock for: {{skus}}."
+  },
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "rateLimited": "Too many requests. Please wait a moment.",

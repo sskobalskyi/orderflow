@@ -32,3 +32,29 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Start the stack
+        run: docker compose up -d --build
+      - name: Wait for the UI, gateway and Keycloak
+        run: |
+          for url in http://localhost:5173 http://localhost:8080/health http://localhost:8180/realms/orderflow; do
+            timeout 240 sh -c "until curl -sf $url >/dev/null; do sleep 3; done"
+          done
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run e2e
+        working-directory: web
+      - if: failure()
+        run: docker compose logs --tail 200
