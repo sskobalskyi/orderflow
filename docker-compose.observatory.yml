@@ -1,0 +1,22 @@
+# Sends telemetry to the Observatory lab (../observatory) instead of the Aspire dashboard:
+#
+#   (cd ../observatory && docker compose up -d)
+#   docker compose -f docker-compose.yml -f docker-compose.observatory.yml up --build
+#
+# Grafana: http://localhost:3000. The services join the Observatory network to reach its OTel Collector.
+
+x-otel: &otel
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  OTEL_METRIC_EXPORT_INTERVAL: "15000" # default is 60s; shorter keeps dashboards lively
+
+networks:
+  observatory:
+    name: observatory_default
+    external: true
+
+services:
+  gateway: { environment: *otel, networks: [default, observatory] }
+  orders: { environment: *otel, networks: [default, observatory] }
+  payments: { environment: *otel, networks: [default, observatory] }
+  inventory: { environment: *otel, networks: [default, observatory] }
+  notifications: { environment: *otel, networks: [default, observatory] }

@@ -70,5 +70,12 @@ public class OrderStateMachine : MassTransitStateMachine<OrderState>
                 .Publish(c => new ReleaseStock(c.Saga.CorrelationId))
                 .Publish(c => new OrderRejected(c.Saga.CorrelationId, c.Message.Reason))
                 .TransitionTo(Rejected));
+
+        // Delivery is at-least-once, so a reply can arrive twice or after the saga has moved on.
+        // Ignoring it is the correct idempotent behaviour; failing would only park it in the error queue.
+        During(AwaitingPayment, Ignore(StockReservedEvent), Ignore(StockRejectedEvent));
+        During(Confirmed, Rejected,
+            Ignore(Submitted), Ignore(StockReservedEvent), Ignore(StockRejectedEvent),
+            Ignore(PaymentCompletedEvent), Ignore(PaymentFailedEvent));
     }
 }

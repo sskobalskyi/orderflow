@@ -1,8 +1,10 @@
+using Orderflow.Observability;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Orderflow.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddOrderflowTelemetry("inventory");
 
 builder.Services.AddDbContext<InventoryDbContext>(o =>
     o.UseNpgsql(builder.Configuration.GetConnectionString("Inventory")));
@@ -17,6 +19,10 @@ builder.Services.AddMassTransit(x =>
         o.UsePostgres();
         o.UseBusOutbox();
     });
+
+    // Consumers and sagas publish through the outbox too: messages leave only after the handler's
+    // transaction commits, so a reply can never overtake the state it replies to.
+    x.AddConfigureEndpointsCallback((ctx, _, endpoint) => endpoint.UseEntityFrameworkOutbox<InventoryDbContext>(ctx));
 
     x.UsingRabbitMq((ctx, cfg) =>
     {
@@ -112,6 +118,7 @@ public class ReserveStockConsumer(InventoryDbContext db) : IConsumer<ReserveStoc
         var missing = wanted.Where(w => !items.TryGetValue(w.Key, out var i) || i.Available < w.Value).Select(w => w.Key).ToList();
         if (missing.Count > 0)
         {
+            OrderflowMetrics.StockReservations.Add(1, new KeyValuePair<string, object?>("result", "rejected"));
             await context.Publish(new StockRejected(msg.OrderId, $"Insufficient stock for: {string.Join(", ", missing)}"));
             return;
         }
@@ -122,6 +129,7 @@ public class ReserveStockConsumer(InventoryDbContext db) : IConsumer<ReserveStoc
             db.Reservations.Add(new Reservation { OrderId = msg.OrderId, Sku = sku, Quantity = qty });
         }
 
+        OrderflowMetrics.StockReservations.Add(1, new KeyValuePair<string, object?>("result", "reserved"));
         await context.Publish(new StockReserved(msg.OrderId));
         await db.SaveChangesAsync(context.CancellationToken);
     }

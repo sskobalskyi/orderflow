@@ -53,6 +53,19 @@ public class OrderFlowTests(StackFixture stack)
         return stock.EnumerateArray().First(s => s.GetProperty("sku").GetString() == sku).GetProperty("available").GetInt32();
     }
 
+    /// <summary>Other tests leave orders in flight, so wait until the stock level stops moving before using it as a baseline.</summary>
+    private async Task<int> SettledAvailable(string sku)
+    {
+        var last = await Available(sku);
+        while (true)
+        {
+            await Task.Delay(700);
+            var now = await Available(sku);
+            if (now == last) return now;
+            last = now;
+        }
+    }
+
     private async Task<List<string>> Steps(Guid customer, Guid orderId)
     {
         var timeline = await (await stack.Orders.SendAsync(Get(customer, $"/orders/{orderId}/timeline"))).Content.ReadFromJsonAsync<JsonElement>();
@@ -63,7 +76,7 @@ public class OrderFlowTests(StackFixture stack)
     public async Task Order_is_confirmed_and_stock_is_reserved()
     {
         var customer = Guid.NewGuid();
-        var before = await Available("A");
+        var before = await SettledAvailable("A");
 
         var created = await PlaceOrder(customer, "A", 2, 10m);
         var id = created.GetProperty("id").GetGuid();
@@ -78,7 +91,7 @@ public class OrderFlowTests(StackFixture stack)
     public async Task Declined_payment_rejects_the_order_and_releases_stock()
     {
         var customer = Guid.NewGuid();
-        var before = await Available("B");
+        var before = await SettledAvailable("B");
 
         var created = await PlaceOrder(customer, "B", 1, 5000m);
         var id = created.GetProperty("id").GetGuid();

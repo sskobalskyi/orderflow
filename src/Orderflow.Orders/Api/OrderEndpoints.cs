@@ -1,6 +1,7 @@
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Orderflow.Contracts;
+using Orderflow.Observability;
 using Orderflow.Orders.Domain;
 using Orderflow.Orders.Infrastructure;
 using StackExchange.Redis;
@@ -44,6 +45,7 @@ public static class OrderEndpoints
             {
                 var order = Order.Submit(customerId, req.Lines, clock);
                 db.Orders.Add(order);
+                OrderflowMetrics.OrdersSubmitted.Add(1);
                 // With the EF bus outbox this publish is persisted in the same SaveChanges transaction.
                 await bus.Publish(order.ToSubmittedEvent(), ct);
                 await db.SaveChangesAsync(ct);

@@ -66,4 +66,24 @@ public class OrderStateMachineTests
         Assert.True(await harness.Published.Any<OrderRejected>());
         Assert.False(await harness.Published.Any<ProcessPayment>());
     }
+
+    [Fact]
+    public async Task Duplicate_reply_after_completion_is_ignored()
+    {
+        await using var provider = Build();
+        var harness = provider.GetRequiredService<ITestHarness>();
+        await harness.Start();
+        var saga = harness.GetSagaStateMachineHarness<OrderStateMachine, OrderState>();
+        var order = NewOrder();
+
+        await harness.Bus.Publish(order);
+        await harness.Bus.Publish(new StockReserved(order.OrderId));
+        await harness.Bus.Publish(new PaymentCompleted(order.OrderId));
+        Assert.NotNull(await saga.Exists(order.OrderId, s => s.Confirmed));
+
+        await harness.Bus.Publish(new StockReserved(order.OrderId));
+
+        Assert.True(await harness.Consumed.Any<StockReserved>(x => x.Context.Message.OrderId == order.OrderId && x.Exception is null));
+        Assert.False(await harness.Consumed.Any<StockReserved>(x => x.Exception is not null));
+    }
 }

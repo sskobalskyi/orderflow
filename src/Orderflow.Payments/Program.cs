@@ -1,8 +1,10 @@
+using Orderflow.Observability;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Orderflow.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddOrderflowTelemetry("payments");
 
 builder.Services.AddDbContext<PaymentsDbContext>(o =>
     o.UseNpgsql(builder.Configuration.GetConnectionString("Payments")));
@@ -16,6 +18,10 @@ builder.Services.AddMassTransit(x =>
         o.UsePostgres();
         o.UseBusOutbox();
     });
+
+    // Consumers and sagas publish through the outbox too: messages leave only after the handler's
+    // transaction commits, so a reply can never overtake the state it replies to.
+    x.AddConfigureEndpointsCallback((ctx, _, endpoint) => endpoint.UseEntityFrameworkOutbox<PaymentsDbContext>(ctx));
 
     x.UsingRabbitMq((ctx, cfg) =>
     {
@@ -89,6 +95,7 @@ public class ProcessPaymentConsumer(PaymentsDbContext db, IConfiguration config)
                 FailureReason = ok ? null : $"Card declined: amount exceeds {limit}",
             };
             db.Payments.Add(payment);
+            OrderflowMetrics.PaymentsProcessed.Add(1, new KeyValuePair<string, object?>("result", ok ? "completed" : "declined"));
         }
 
         if (payment.Succeeded)

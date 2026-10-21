@@ -3,6 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG SERVICE
 WORKDIR /src
 COPY src/Orderflow.Contracts/*.csproj src/Orderflow.Contracts/
+COPY src/Orderflow.Observability/*.csproj src/Orderflow.Observability/
 COPY src/Orderflow.${SERVICE}/*.csproj src/Orderflow.${SERVICE}/
 RUN dotnet restore src/Orderflow.${SERVICE}
 COPY src src

@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orderflow.Contracts\Orderflow.Contracts.csproj" />
+    <ProjectReference Include="..\Orderflow.Observability\Orderflow.Observability.csproj" />
   </ItemGroup>
 
   <ItemGroup>

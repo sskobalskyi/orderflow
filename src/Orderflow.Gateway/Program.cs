@@ -1,3 +1,4 @@
+using Orderflow.Observability;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -5,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddOrderflowTelemetry("gateway");
 
 var auth = builder.Configuration.GetSection("Auth");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

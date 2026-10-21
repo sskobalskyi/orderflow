@@ -1,8 +1,10 @@
+using Orderflow.Observability;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Orderflow.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddOrderflowTelemetry("notifications");
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<NotificationsDbContext>(o =>
@@ -13,6 +15,10 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumer<OrderOutcomeNotifier>();
 
     x.AddEntityFrameworkOutbox<NotificationsDbContext>(o => o.UsePostgres());
+
+    // Consumers and sagas publish through the outbox too: messages leave only after the handler's
+    // transaction commits, so a reply can never overtake the state it replies to.
+    x.AddConfigureEndpointsCallback((ctx, _, endpoint) => endpoint.UseEntityFrameworkOutbox<NotificationsDbContext>(ctx));
 
     x.UsingRabbitMq((ctx, cfg) =>
     {

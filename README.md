@@ -57,7 +57,7 @@ Decisions are recorded in [docs/adr](docs/adr).
 - [x] CQRS read model (`GET /orders/{id}/timeline`) and Redis `Idempotency-Key` on `POST /orders`
 - [x] YARP gateway (JWT, rate limiting, CORS) and Keycloak with demo users `demo` and `alice`
 - [x] React UI (Vite, TanStack Query, oidc-client-ts) with order form, list and live saga timeline, `en` / `uk`
-- [ ] OpenTelemetry into the shared observability stack
+- [x] OpenTelemetry (traces, metrics, logs) into the Observatory stack, saga dashboard
 
 ## Try the saga
 
@@ -84,3 +84,19 @@ Messages that still fail after retries are parked in `<queue>_error` (see the Ra
 ./scripts/replay-errors.ps1           # move every *_error message back to its queue
 ```
 Each service applies its EF Core migrations on startup (`src/*/Migrations`).
+
+## Observability
+Every service exports OpenTelemetry traces, metrics and logs over OTLP. One order is one trace from the gateway through RabbitMQ to Payments, Inventory and Notifications.
+
+```powershell
+# Option A: self-contained, Aspire dashboard on http://localhost:18888
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up --build
+
+# Option B: the Observatory lab (Grafana, Tempo, Prometheus, Loki), from the sibling ../observatory repo
+(cd ../observatory; docker compose up -d)
+docker compose -f docker-compose.yml -f docker-compose.observatory.yml up --build
+```
+
+Import `docs/grafana/orderflow-saga.json` into Grafana (Dashboards, New, Import) for the saga dashboard:
+
+![Orderflow saga dashboard](docs/images/grafana-saga.png)

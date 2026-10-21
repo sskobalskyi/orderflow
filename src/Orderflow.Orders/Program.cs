@@ -1,3 +1,4 @@
+using Orderflow.Observability;
 using MassTransit;
 using StackExchange.Redis;
 using Microsoft.AspNetCore.Diagnostics;
@@ -8,6 +9,7 @@ using Orderflow.Orders.Infrastructure;
 using Orderflow.Orders.Sagas;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddOrderflowTelemetry("orders");
 
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton(TimeProvider.System);
@@ -35,6 +37,10 @@ builder.Services.AddMassTransit(x =>
         o.UsePostgres();
         o.UseBusOutbox();
     });
+
+    // Consumers and sagas publish through the outbox too: messages leave only after the handler's
+    // transaction commits, so a reply can never overtake the state it replies to.
+    x.AddConfigureEndpointsCallback((ctx, _, endpoint) => endpoint.UseEntityFrameworkOutbox<OrdersDbContext>(ctx));
 
     x.UsingRabbitMq((ctx, cfg) =>
     {
