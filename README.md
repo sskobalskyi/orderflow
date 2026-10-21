@@ -172,3 +172,7 @@ docs/                         ADRs, Grafana dashboard, images
 ## Known limits
 
 This is a local-first demo, not a production template. Migrations run on startup instead of through a bundle, the Keycloak realm uses `start-dev`, services trust the gateway on the internal network, and the payment provider is a mock with a fixed limit.
+
+## License
+
+[MIT](LICENSE)
