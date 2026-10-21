@@ -19,7 +19,7 @@ jobs:
         language: [csharp, javascript-typescript]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         if: matrix.language == 'csharp'
         with:
           dotnet-version: 9.0.x
