@@ -16,4 +16,4 @@ Other projects (billing, fulfilment, analytics) need to react to what happens to
 ## Consequences
 - Two outboxes in the Orders database with different jobs: MassTransit's for internal messages, the integration outbox for the public contract. The cost is a little code; the gain is an exact wire format.
 - The contract is vendored. When the Greenhaus copy changes, copy it again and the conformance tests show what broke.
-- Not done yet: consuming `device.claimed.v1` to show an order as activated, and restocking returned goods.
+- Returned goods go back on the shelf: a registered return, or a refund before shipping (a cancellation), makes Orders send `ReleaseStock` to Inventory, which is idempotent, so a refund after a return never restocks twice. A refund after shipping without a return does not restock, because the goods are with the customer.

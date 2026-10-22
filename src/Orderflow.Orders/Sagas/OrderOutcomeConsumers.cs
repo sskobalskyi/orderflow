@@ -50,6 +50,10 @@ public class PaymentRefundedConsumer(OrdersDbContext db, TimeProvider clock) : I
         var order = await db.Orders.FirstAsync(o => o.Id == msg.OrderId, context.CancellationToken);
         if (!order.MarkRefunded(msg.Amount, msg.Reason, clock)) return;
 
+        // A refund before shipping is a cancellation: the goods never left, so the stock is released.
+        // After shipping the goods are with the customer; they were restocked when the return was registered.
+        if (order.ShippedAt is null) await context.Publish(new ReleaseStock(order.Id), context.CancellationToken);
+
         db.Timeline.Add(new TimelineEntry { OrderId = order.Id, Step = "Refunded", Detail = $"{msg.Amount:0.00} {order.Currency}", At = clock.GetUtcNow() });
         db.AddIntegrationEvent(new OrderRefundedV1(order.Id, order.CustomerId.ToString(), msg.Amount, order.Currency,
             order.RefundedAt!.Value, msg.Reason), clock);
