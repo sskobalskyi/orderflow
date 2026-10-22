@@ -153,6 +153,28 @@ docker compose up -d --build; cd web; npm run e2e   # Playwright against the ful
 - `tests/Orderflow.IntegrationTests`: real PostgreSQL, RabbitMQ and Redis with the five services in-process. Covers the happy path, catalog pricing, compensation, out-of-stock, idempotency, customer isolation, error codes, notifications, and the whole shipping, return and refund lifecycle. A raw AMQP listener, standing in for an outside consumer, validates each published integration event and its headers against the AsyncAPI contract, plus a test that proves the validator fails on a broken payload.
 - `web/e2e`: Keycloak login, ordering, the saga timeline, customer isolation, `uk` locale, and the admin flow across two browsers (ship, return, refund). The screenshots in this README come from this suite.
 
+## Selling something else
+
+The catalog and the stock are data, so a deployment sells its own products without code changes. Two files are loaded into empty tables on first start:
+
+- `Catalog:SeedFile`: products with a price, currency and `en` and `uk` texts, as in [`src/Orderflow.Catalog/Seed/products.json`](src/Orderflow.Catalog/Seed/products.json).
+- `Inventory:SeedFile`: initial stock, a JSON array such as `[{ "sku": "KIT-01", "available": 50 }]`. Without it the demo stock is used.
+
+Mount both through a compose override and point the settings at them:
+
+```yaml
+# docker-compose.shop.yml, used as: docker compose -f docker-compose.yml -f docker-compose.shop.yml up --build
+services:
+  catalog:
+    environment: { Catalog__SeedFile: /seed/products.json }
+    volumes: ["./my-shop/products.json:/seed/products.json:ro"]
+  inventory:
+    environment: { Inventory__SeedFile: /seed/stock.json }
+    volumes: ["./my-shop/stock.json:/seed/stock.json:ro"]
+```
+
+Both files are only read when their table is empty; use `docker compose down -v` to start over. Orderflow stays generic: it knows SKUs, prices, names and quantities, not what is in the box.
+
 ## Observability
 
 Every service exports OpenTelemetry over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.

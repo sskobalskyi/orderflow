@@ -2,6 +2,7 @@ using Orderflow.Observability;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Orderflow.Contracts;
+using Orderflow.Inventory;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddOrderflowTelemetry("inventory");
@@ -46,7 +47,7 @@ using (var scope = app.Services.CreateScope())
     await db.Database.MigrateAsync();
     if (!await db.Stock.AnyAsync())
     {
-        db.Stock.AddRange(new StockItem("LAMP-01", 100), new StockItem("MUG-01", 50), new StockItem("DESK-01", 5));
+        db.Stock.AddRange(StockSeed.Load(builder.Configuration["Inventory:SeedFile"]).Select(s => new StockItem(s.Sku, s.Available)));
         await db.SaveChangesAsync();
     }
 }
