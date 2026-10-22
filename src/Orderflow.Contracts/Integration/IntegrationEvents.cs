@@ -13,6 +13,8 @@ public static class IntegrationAddress
     public const string OrderShipped = "order.shipped.v1";
     public const string OrderReturned = "order.returned.v1";
     public const string OrderRefunded = "order.refunded.v1";
+    /// <summary>Consumed, not published: another system reports the goods of an order in use.</summary>
+    public const string DeviceClaimed = "device.claimed.v1";
 }
 
 public record IntegrationOrderLine(string Sku, int Quantity, decimal UnitPrice);

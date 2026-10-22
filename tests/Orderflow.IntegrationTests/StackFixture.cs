@@ -32,6 +32,7 @@ public class StackFixture : IAsyncLifetime
     public HttpClient Inventory { get; private set; } = null!;
     public HttpClient Notifications { get; private set; } = null!;
     public IntegrationEventTap Events { get; private set; } = null!;
+    public Uri BrokerUri => new(_rabbit.GetConnectionString());
 
     public async Task InitializeAsync()
     {

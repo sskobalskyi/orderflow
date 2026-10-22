@@ -15,6 +15,7 @@ public class OrdersDbContext(DbContextOptions<OrdersDbContext> options) : SagaDb
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<TimelineEntry> Timeline => Set<TimelineEntry>();
     public DbSet<IntegrationOutboxMessage> IntegrationOutbox => Set<IntegrationOutboxMessage>();
+    public DbSet<IntegrationInboxMessage> IntegrationInbox => Set<IntegrationInboxMessage>();
 
     protected override IEnumerable<ISagaClassMap> Configurations => [new OrderStateMap()];
 
@@ -58,6 +59,13 @@ public class OrdersDbContext(DbContextOptions<OrdersDbContext> options) : SagaDb
             e.Property(m => m.RoutingKey).HasMaxLength(100);
             e.Property(m => m.Traceparent).HasMaxLength(100);
             e.HasIndex(m => m.PublishedAt).HasFilter("\"PublishedAt\" IS NULL");
+        });
+
+        b.Entity<IntegrationInboxMessage>(e =>
+        {
+            e.ToTable("integration_inbox");
+            e.HasKey(m => new { m.MessageId, m.Consumer });
+            e.Property(m => m.Consumer).HasMaxLength(64);
         });
 
         // Transactional outbox tables: events are stored in the same transaction as the order.

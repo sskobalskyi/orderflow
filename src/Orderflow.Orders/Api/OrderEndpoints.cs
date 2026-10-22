@@ -177,6 +177,6 @@ public static class OrderEndpoints
     private static object ToDto(Order o) => new
     {
         o.Id, o.CustomerId, Status = o.Status.ToString(), o.RejectionReason, o.Currency, o.CreatedAt,
-        o.ConfirmedAt, o.ShippedAt, o.ReturnedAt, o.RefundedAt, o.RefundAmount, o.Lines, o.Total,
+        o.ConfirmedAt, o.ShippedAt, o.ActivatedAt, o.ReturnedAt, o.RefundedAt, o.RefundAmount, o.Lines, o.Total,
     };
 }

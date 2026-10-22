@@ -14,6 +14,7 @@ builder.AddOrderflowTelemetry("orders");
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<IntegrationOutboxPublisher>();
+builder.Services.AddHostedService<DeviceClaimedListener>();
 builder.Services.AddHttpClient<CatalogClient>(c => c.BaseAddress = new Uri(builder.Configuration["Catalog:BaseUrl"] ?? "http://localhost:8084"))
     .AddStandardResilienceHandler();
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>

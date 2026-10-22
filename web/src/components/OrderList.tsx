@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ApiError, listOrders, listProducts, returnOrder } from '@/api'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Alert } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -64,7 +65,10 @@ export function OrderList({ selected, onSelect }: { selected: string | null; onS
                   <TableCell className="max-w-64 truncate">{o.lines.map((l) => `${nameOf(l.sku)} × ${l.quantity}`).join(', ')}</TableCell>
                   <TableCell>{formatMoney(o.total, o.currency, locale)}</TableCell>
                   <TableCell>
-                    <StatusBadge status={o.status} />
+                    <span className="flex flex-wrap items-center gap-1">
+                      <StatusBadge status={o.status} />
+                      {o.activatedAt && <Badge variant="success" data-testid="activated">{t('orders.activated')}</Badge>}
+                    </span>
                   </TableCell>
                   <TableCell>
                     {o.status === 'Shipped' && (
