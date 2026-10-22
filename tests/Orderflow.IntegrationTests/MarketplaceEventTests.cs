@@ -201,6 +201,90 @@ public class MarketplaceEventTests(StackFixture stack)
             await Steps(customer, id));
     }
 
+    private async Task<int> Available(string sku)
+    {
+        var stock = await stack.Inventory.GetFromJsonAsync<JsonElement>("/stock");
+        return stock.EnumerateArray().First(s => s.GetProperty("sku").GetString() == sku).GetProperty("available").GetInt32();
+    }
+
+    /// <summary>Earlier tests leave stock movements in flight, so wait until the level stops changing.</summary>
+    private async Task<int> SettledAvailable(string sku)
+    {
+        var last = await Available(sku);
+        while (true)
+        {
+            await Task.Delay(900);
+            var now = await Available(sku);
+            if (now == last) return now;
+            last = now;
+        }
+    }
+
+    [Fact]
+    public async Task A_return_puts_the_goods_back_on_the_shelf()
+    {
+        var (customer, id) = await ConfirmedOrder(); // 2 x LAMP-01 and 1 x MUG-01
+        (await Admin(id, "ship")).EnsureSuccessStatusCode();
+        var lamps = await SettledAvailable("LAMP-01");
+        var mugs = await SettledAvailable("MUG-01");
+
+        (await Return(customer, id)).EnsureSuccessStatusCode();
+
+        await Eventually(async () => await Available("LAMP-01") == lamps + 2 && await Available("MUG-01") == mugs + 1);
+    }
+
+    [Fact]
+    public async Task Refunding_before_shipping_is_a_cancellation_and_releases_the_stock()
+    {
+        var (_, id) = await ConfirmedOrder();
+        var lamps = await SettledAvailable("LAMP-01");
+
+        (await Admin(id, "refund")).EnsureSuccessStatusCode();
+
+        await Eventually(async () => await Available("LAMP-01") == lamps + 2);
+    }
+
+    [Fact]
+    public async Task Refunding_after_a_return_does_not_restock_twice()
+    {
+        var (customer, id) = await ConfirmedOrder();
+        (await Admin(id, "ship")).EnsureSuccessStatusCode();
+        (await Return(customer, id)).EnsureSuccessStatusCode();
+        var lamps = await SettledAvailable("LAMP-01");
+
+        (await Admin(id, "refund")).EnsureSuccessStatusCode();
+        await WaitForStatus(customer, id, "Refunded");
+        await Task.Delay(1500);
+
+        Assert.Equal(lamps, await Available("LAMP-01"));
+    }
+
+    [Fact]
+    public async Task Refunding_shipped_goods_that_were_not_returned_keeps_the_stock_down()
+    {
+        var (customer, id) = await ConfirmedOrder();
+        (await Admin(id, "ship")).EnsureSuccessStatusCode();
+        var lamps = await SettledAvailable("LAMP-01");
+
+        (await Admin(id, "refund")).EnsureSuccessStatusCode();
+        await WaitForStatus(customer, id, "Refunded");
+        await Task.Delay(1500);
+
+        Assert.Equal(lamps, await Available("LAMP-01"));
+    }
+
+    private static async Task Eventually(Func<Task<bool>> condition)
+    {
+        var deadline = DateTime.UtcNow + Timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await condition()) return;
+            await Task.Delay(200);
+        }
+
+        throw new TimeoutException("Condition was not met in time.");
+    }
+
     [Fact]
     public async Task A_partial_refund_publishes_the_refunded_amount()
     {

@@ -89,7 +89,7 @@ public static class OrderEndpoints
 
         // The customer sends a shipped order back. The integration event tells other systems, for example
         // a billing service that grants benefits for purchases.
-        group.MapPost("/{id:guid}/return", async (Guid id, HttpRequest http, OrdersDbContext db,
+        group.MapPost("/{id:guid}/return", async (Guid id, HttpRequest http, OrdersDbContext db, IPublishEndpoint bus,
             TimeProvider clock, CancellationToken ct) =>
         {
             if (CustomerId(http) is not { } customerId)
@@ -99,6 +99,8 @@ public static class OrderEndpoints
 
             order.RegisterReturn(clock);
             AddTimeline(db, order.Id, "Returned", null, clock);
+            // The goods are back in the warehouse: Inventory puts them on the shelf again.
+            await bus.Publish(new ReleaseStock(order.Id), ct);
             db.AddIntegrationEvent(new OrderReturnedV1(order.Id, order.CustomerId.ToString(), order.ReturnedAt!.Value,
                 ToIntegrationLines(order)), clock);
             await db.SaveChangesAsync(ct);

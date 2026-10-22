@@ -124,7 +124,7 @@ Endpoints, all behind the gateway under `/api`. Prices always come from the cata
 | `GET /admin/orders`, `POST /admin/orders/{id}/ship`, `POST /admin/orders/{id}/refund` | `admin` role | Fulfilment and refunds (`{"amount": 10, "reason": "..."}` is optional) |
 | `PUT /admin/products/{sku}` | `admin` role | Add or change a product |
 
-An order moves `Submitted` to `Confirmed` (or `Rejected`), then `Shipped`, `Returned` and `Refunded`. A refund can also follow a confirmed order, which acts as a cancellation.
+An order moves `Submitted` to `Confirmed` (or `Rejected`), then `Shipped`, `Returned` and `Refunded`. A refund can also follow a confirmed order, which acts as a cancellation. Goods go back in stock when a return is registered or an unshipped order is refunded.
 
 ## Activation by a claimed device
 
@@ -202,7 +202,7 @@ docs/                         ADRs, Grafana dashboard, images
 
 ## Known limits
 
-This is a local-first demo, not a production template. returned goods are not restocked, an order can be refunded once, and migrations run on startup instead of through a bundle, the Keycloak realm uses `start-dev`, services trust the gateway on the internal network, and the payment provider is a mock with a fixed limit.
+This is a local-first demo, not a production template. An order can be refunded once, and migrations run on startup instead of through a bundle, the Keycloak realm uses `start-dev`, services trust the gateway on the internal network, and the payment provider is a mock with a fixed limit.
 
 ## License
 
