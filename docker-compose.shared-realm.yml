@@ -1,0 +1,31 @@
+# Runs Orderflow against a shared Keycloak realm instead of its own, so a user has one identity across projects
+# (the subject in order.confirmed.v1 is then the same one the other projects see after sign-in).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.shared-realm.yml up --build
+#
+# Expects Keycloak with the realm `greenhaus` on http://localhost:8181 (docker-compose.auth.yml in the greenhaus
+# repo). That realm already contains the client `orderflow-web`, the role `admin` and the users admin, demo and
+# alice. Orderflow's own Keycloak does not start in this mode: it would only claim port 8180.
+# Without this file Orderflow starts alone with its own realm, as before.
+
+services:
+  # Not started by default any more; `--profile standalone-auth` brings it back if you ever need it next to the shared one.
+  keycloak:
+    profiles: [standalone-auth]
+
+  gateway:
+    environment:
+      # The container reaches Keycloak through the host; tokens carry the public address (KC_HOSTNAME).
+      Auth__MetadataAddress: http://host.docker.internal:8181/realms/greenhaus/.well-known/openid-configuration
+      Auth__Issuer: http://localhost:8181/realms/greenhaus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on: !override
+      - orders
+      - catalog
+
+  web:
+    build:
+      context: ./web
+      args:
+        VITE_OIDC_AUTHORITY: http://localhost:8181/realms/greenhaus

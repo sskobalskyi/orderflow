@@ -153,6 +153,16 @@ docker compose up -d --build; cd web; npm run e2e   # Playwright against the ful
 - `tests/Orderflow.IntegrationTests`: real PostgreSQL, RabbitMQ and Redis with the five services in-process. Covers the happy path, catalog pricing, compensation, out-of-stock, idempotency, customer isolation, error codes, notifications, and the whole shipping, return and refund lifecycle. A raw AMQP listener, standing in for an outside consumer, validates each published integration event and its headers against the AsyncAPI contract, plus a test that proves the validator fails on a broken payload.
 - `web/e2e`: Keycloak login, ordering, the saga timeline, customer isolation, `uk` locale, and the admin flow across two browsers (ship, return, refund). The screenshots in this README come from this suite.
 
+## One identity across projects
+
+By default Orderflow starts alone with its own Keycloak realm. To share one realm with other projects, so a user has the same subject everywhere (the `customerId` in `order.confirmed.v1` is that subject), start Keycloak with the shared realm on port 8181 and add the override:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.shared-realm.yml up --build
+```
+
+The override points the gateway (`Auth__MetadataAddress`, `Auth__Issuer`) and the UI build (`VITE_OIDC_AUTHORITY`) at the shared realm and does not start Orderflow's own Keycloak. The realm must contain the public client `orderflow-web` (PKCE, redirect `http://localhost:5173/*`), the realm role `admin`, and the `realm roles` mapper that writes the `roles` claim. Checked against the `greenhaus` realm: a customer's subject appears as the order's `customerId` and in `order.confirmed.v1`, `admin` reaches the admin routes, other users get 403, and the Playwright suite passes.
+
 ## Selling something else
 
 The catalog and the stock are data, so a deployment sells its own products without code changes. Two files are loaded into empty tables on first start:
