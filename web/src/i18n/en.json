@@ -16,6 +16,7 @@
   "orders": {
     "title": "My orders",
     "empty": "No orders yet.",
+    "activated": "In use",
     "created": "Created",
     "items": "Items",
     "total": "Total",
@@ -43,6 +44,7 @@
       "Confirmed": "Order confirmed",
       "Rejected": "Order rejected",
       "Shipped": "Order shipped",
+      "Activated": "Put into use",
       "Returned": "Return registered",
       "Refunded": "Refund issued"
     }

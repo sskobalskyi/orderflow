@@ -197,6 +197,9 @@ namespace Orderflow.Orders.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("ConfirmedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -270,6 +273,23 @@ namespace Orderflow.Orders.Migrations
                         .IsUnique();
 
                     b.ToTable("order_timeline", "app");
+                });
+
+            modelBuilder.Entity("Orderflow.Orders.Infrastructure.IntegrationInboxMessage", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Consumer")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("MessageId", "Consumer");
+
+                    b.ToTable("integration_inbox", "app");
                 });
 
             modelBuilder.Entity("Orderflow.Orders.Infrastructure.IntegrationOutboxMessage", b =>

@@ -12,6 +12,8 @@ export interface Order {
   rejectionReason: string | null
   currency: string
   createdAt: string
+  /** Set when an outside system reported the goods of a shipped order in use. */
+  activatedAt?: string | null
   lines: OrderLine[]
   total: number
 }

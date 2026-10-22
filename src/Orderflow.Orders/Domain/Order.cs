@@ -19,6 +19,8 @@ public class Order
     public DateTimeOffset? ShippedAt { get; private set; }
     public DateTimeOffset? ReturnedAt { get; private set; }
     public DateTimeOffset? RefundedAt { get; private set; }
+    /// <summary>When an outside system reported the goods put into use, for example a controller linked to its owner.</summary>
+    public DateTimeOffset? ActivatedAt { get; private set; }
     public decimal? RefundAmount { get; private set; }
     public string? RefundReason { get; private set; }
     public string? RejectionReason { get; private set; }
@@ -66,6 +68,17 @@ public class Order
             throw new DomainException("order_not_shippable", "Only a confirmed order can be shipped.");
         Status = OrderStatus.Shipped;
         ShippedAt = clock.GetUtcNow();
+    }
+
+    /// <summary>
+    /// An outside system says the goods of this order are in use. Only a shipped order can be activated, and only once:
+    /// a second report, or one that arrives for an order in another state, changes nothing.
+    /// </summary>
+    public bool MarkActivated(DateTimeOffset at)
+    {
+        if (Status != OrderStatus.Shipped || ActivatedAt is not null) return false;
+        ActivatedAt = at;
+        return true;
     }
 
     /// <summary>The customer sends a shipped order back.</summary>

@@ -126,6 +126,10 @@ Endpoints, all behind the gateway under `/api`. Prices always come from the cata
 
 An order moves `Submitted` to `Confirmed` (or `Rejected`), then `Shipped`, `Returned` and `Refunded`. A refund can also follow a confirmed order, which acts as a cancellation.
 
+## Activation by a claimed device
+
+Orderflow also *consumes* one event, `device.claimed.v1`. Another system (the Greenhaus API) publishes it when a person links the device they bought, and names the order when the device was sold here. Orderflow marks that shipped order as **in use**: an `Activated` timeline step with the device id, an `activatedAt` on the order and an "In use" badge in the list, in `en` and `uk`. It reads only the order id, the device id and the time, so what the device is stays outside Orderflow. See [ADR 0006](docs/adr/0006-consuming-device-claimed.md).
+
 ## Integration events
 
 Other systems consume four events from the topic exchange `integration.events`, with the event name as routing key. Every message is raw JSON, carries the AMQP headers `messageId`, `occurredAt`, `schemaVersion` and `traceparent`, and is delivered at least once, so consumers deduplicate on `messageId`. The schemas live in [`contracts/integration-events.yaml`](contracts/integration-events.yaml), a vendored copy of the AsyncAPI document owned by the Greenhaus repo, and the integration tests validate every published message against it.
@@ -198,7 +202,7 @@ docs/                         ADRs, Grafana dashboard, images
 
 ## Known limits
 
-This is a local-first demo, not a production template. Orderflow does not consume `device.claimed.v1` yet, returned goods are not restocked, an order can be refunded once, and migrations run on startup instead of through a bundle, the Keycloak realm uses `start-dev`, services trust the gateway on the internal network, and the payment provider is a mock with a fixed limit.
+This is a local-first demo, not a production template. returned goods are not restocked, an order can be refunded once, and migrations run on startup instead of through a bundle, the Keycloak realm uses `start-dev`, services trust the gateway on the internal network, and the payment provider is a mock with a fixed limit.
 
 ## License
 
