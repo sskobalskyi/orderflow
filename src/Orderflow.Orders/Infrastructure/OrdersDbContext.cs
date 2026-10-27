@@ -47,7 +47,7 @@ public class OrdersDbContext(DbContextOptions<OrdersDbContext> options) : SagaDb
         b.Entity<TimelineEntry>(e =>
         {
             e.ToTable("order_timeline");
-            e.HasIndex(t => new { t.OrderId, t.Step }).IsUnique();
+            e.HasIndex(t => new { t.OrderId, t.Step });
             e.Property(t => t.Step).HasMaxLength(40);
             e.Property(t => t.Detail).HasMaxLength(500);
         });

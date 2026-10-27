@@ -27,6 +27,7 @@ public static class IntegrationOutbox
         [typeof(OrderConfirmedV1)] = IntegrationAddress.OrderConfirmed,
         [typeof(OrderShippedV1)] = IntegrationAddress.OrderShipped,
         [typeof(OrderReturnedV1)] = IntegrationAddress.OrderReturned,
+        [typeof(OrderReturnCancelledV1)] = IntegrationAddress.OrderReturnCancelled,
         [typeof(OrderRefundedV1)] = IntegrationAddress.OrderRefunded,
     };
 

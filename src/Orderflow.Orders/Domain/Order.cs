@@ -18,6 +18,7 @@ public class Order
     public DateTimeOffset? ConfirmedAt { get; private set; }
     public DateTimeOffset? ShippedAt { get; private set; }
     public DateTimeOffset? ReturnedAt { get; private set; }
+    public DateTimeOffset? ReturnReceivedAt { get; private set; }
     public DateTimeOffset? RefundedAt { get; private set; }
     /// <summary>When an outside system reported the goods put into use, for example a controller linked to its owner.</summary>
     public DateTimeOffset? ActivatedAt { get; private set; }
@@ -88,6 +89,25 @@ public class Order
             throw new DomainException("order_not_returnable", "Only a shipped order can be returned.");
         Status = OrderStatus.Returned;
         ReturnedAt = clock.GetUtcNow();
+    }
+
+    /// <summary>The customer or an admin cancels a return that has not been received yet: the goods stay with the customer.</summary>
+    public void CancelReturn()
+    {
+        if (Status != OrderStatus.Returned || ReturnReceivedAt is not null)
+            throw new DomainException("order_return_not_cancellable", "Only a return that was not received yet can be cancelled.");
+        Status = OrderStatus.Shipped;
+        ReturnedAt = null;
+    }
+
+    /// <summary>An admin confirms the returned goods arrived back in the warehouse.</summary>
+    public void ReceiveReturn(TimeProvider clock)
+    {
+        if (Status != OrderStatus.Returned)
+            throw new DomainException("order_return_not_receivable", "Only a registered return can be received.");
+        if (ReturnReceivedAt is not null)
+            throw new DomainException("order_return_already_received", "This return was already received.");
+        ReturnReceivedAt = clock.GetUtcNow();
     }
 
     /// <summary>Checks a refund request before money moves. Returns the amount to refund.</summary>

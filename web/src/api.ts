@@ -56,3 +56,7 @@ export const adminListOrders = () => request<Order[]>('/api/admin/orders')
 export const adminShip = (id: string) => request<Order>(`/api/admin/orders/${id}/ship`, { method: 'POST' })
 export const adminRefund = (id: string) =>
   request<{ id: string }>(`/api/admin/orders/${id}/refund`, { method: 'POST', body: JSON.stringify({ reason: 'admin refund' }) })
+
+export const cancelReturn = (id: string) => request<Order>(`/api/orders/${id}/return/cancel`, { method: 'POST' })
+export const adminReceiveReturn = (id: string) => request<Order>(`/api/admin/orders/${id}/return/receive`, { method: 'POST' })
+export const adminCancelReturn = (id: string) => request<Order>(`/api/admin/orders/${id}/return/cancel`, { method: 'POST' })

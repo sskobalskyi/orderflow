@@ -120,11 +120,11 @@ Endpoints, all behind the gateway under `/api`. Prices always come from the cata
 | --- | --- | --- |
 | `GET /products?lang=uk` | anyone | Catalog in a language (falls back to English) |
 | `POST /orders`, `GET /orders`, `GET /orders/{id}`, `GET /orders/{id}/timeline` | signed in | Place and track your orders |
-| `POST /orders/{id}/return` | the order's owner | Return a shipped order |
-| `GET /admin/orders`, `POST /admin/orders/{id}/ship`, `POST /admin/orders/{id}/refund` | `admin` role | Fulfilment and refunds (`{"amount": 10, "reason": "..."}` is optional) |
+| `POST /orders/{id}/return`, `POST /orders/{id}/return/cancel` | the order's owner | Return a shipped order, or cancel a return that was not received yet |
+| `GET /admin/orders`, `POST /admin/orders/{id}/ship`, `POST /admin/orders/{id}/return/receive`, `POST /admin/orders/{id}/return/cancel`, `POST /admin/orders/{id}/refund` | `admin` role | Fulfilment, returns and refunds (`{"amount": 10, "reason": "..."}` is optional) |
 | `PUT /admin/products/{sku}` | `admin` role | Add or change a product |
 
-An order moves `Submitted` to `Confirmed` (or `Rejected`), then `Shipped`, `Returned` and `Refunded`. A refund can also follow a confirmed order, which acts as a cancellation. Goods go back in stock when a return is registered or an unshipped order is refunded.
+An order moves `Submitted` to `Confirmed` (or `Rejected`), then `Shipped`, `Returned` and `Refunded`. A registered return can be cancelled until an admin marks it received, which puts the order back to `Shipped`. A refund can also follow a confirmed order, which acts as a cancellation. Goods go back in stock when an admin receives a return, or when an unshipped order or a return on its way is refunded, never twice.
 
 ## Activation by a claimed device
 
@@ -139,6 +139,7 @@ Other systems consume four events from the topic exchange `integration.events`, 
 | `order.confirmed.v1` | the saga confirms an order (customer, lines, total, currency) |
 | `order.shipped.v1` | an admin marks the order shipped |
 | `order.returned.v1` | the customer returns a shipped order |
+| `order.return_cancelled.v1` | a return that was not received yet is cancelled by the customer or an admin; the order is shipped again |
 | `order.refunded.v1` | Payments confirmed a refund (amount, currency, reason) |
 
 ## Tests
