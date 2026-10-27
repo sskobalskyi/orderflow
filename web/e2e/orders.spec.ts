@@ -89,11 +89,20 @@ test('an order is shipped by an admin, returned by the customer and refunded', a
   await customer.getByRole('button', { name: 'Return' }).first().click()
   await expect(latestBadge(customer)).toHaveAttribute('data-status', 'Returned')
 
+  // The customer changes their mind: the return is cancelled and the order is shipped again, then returned for real.
+  await customer.getByRole('button', { name: 'Cancel return' }).first().click()
+  await expect(latestBadge(customer)).toHaveAttribute('data-status', 'Shipped')
+  await customer.getByRole('button', { name: 'Return', exact: true }).first().click()
+  await expect(latestBadge(customer)).toHaveAttribute('data-status', 'Returned')
+
   await expect(admin.locator('[data-status=Returned]').first()).toBeVisible({ timeout: 15_000 })
+  const returned = admin.locator('tbody tr', { has: admin.locator('[data-status=Returned]') }).first()
+  await returned.getByRole('button', { name: 'Receive return' }).click()
+  await expect(customer.locator('[data-testid=timeline] li strong')).toContainText(['Return received'], { timeout: 15_000 })
   await admin.locator('tbody tr', { has: admin.locator('[data-status=Returned]') }).first().getByRole('button', { name: 'Refund' }).click()
 
   await expect(latestBadge(customer)).toHaveAttribute('data-status', 'Refunded', { timeout: 15_000 })
-  await expect(customer.locator('[data-testid=timeline] li strong')).toContainText(['Order shipped', 'Return registered', 'Refund issued'])
+  await expect(customer.locator('[data-testid=timeline] li strong')).toContainText(['Order shipped', 'Return registered', 'Return cancelled', 'Return received', 'Refund issued'])
 })
 
 test('a customer cannot reach the admin API', async ({ page }) => {

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { adminListOrders, adminRefund, adminShip, ApiError } from '@/api'
+import { adminCancelReturn, adminListOrders, adminReceiveReturn, adminRefund, adminShip, ApiError } from '@/api'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,10 @@ export function AdminOrders() {
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['admin-orders'] })
   const ship = useMutation({ mutationFn: adminShip, onSuccess: refresh })
   const refund = useMutation({ mutationFn: adminRefund, onSuccess: refresh })
-  const error = (ship.error ?? refund.error) instanceof ApiError ? ((ship.error ?? refund.error) as ApiError) : null
+  const receive = useMutation({ mutationFn: adminReceiveReturn, onSuccess: refresh })
+  const undoReturn = useMutation({ mutationFn: adminCancelReturn, onSuccess: refresh })
+  const failure = ship.error ?? refund.error ?? receive.error ?? undoReturn.error
+  const error = failure instanceof ApiError ? failure : null
 
   return (
     <Card>
@@ -54,6 +57,16 @@ export function AdminOrders() {
                       <Button size="sm" onClick={() => ship.mutate(o.id)} disabled={ship.isPending}>
                         {t('admin.ship')}
                       </Button>
+                    )}
+                    {o.status === 'Returned' && !o.returnReceivedAt && (
+                      <>
+                        <Button size="sm" onClick={() => receive.mutate(o.id)} disabled={receive.isPending}>
+                          {t('admin.receiveReturn')}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => undoReturn.mutate(o.id)} disabled={undoReturn.isPending}>
+                          {t('admin.cancelReturn')}
+                        </Button>
+                      </>
                     )}
                     {REFUNDABLE.has(o.status) && (
                       <Button size="sm" variant="outline" onClick={() => refund.mutate(o.id)} disabled={refund.isPending}>

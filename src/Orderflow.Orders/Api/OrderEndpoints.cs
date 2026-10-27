@@ -89,7 +89,7 @@ public static class OrderEndpoints
 
         // The customer sends a shipped order back. The integration event tells other systems, for example
         // a billing service that grants benefits for purchases.
-        group.MapPost("/{id:guid}/return", async (Guid id, HttpRequest http, OrdersDbContext db, IPublishEndpoint bus,
+        group.MapPost("/{id:guid}/return", async (Guid id, HttpRequest http, OrdersDbContext db,
             TimeProvider clock, CancellationToken ct) =>
         {
             if (CustomerId(http) is not { } customerId)
@@ -99,11 +99,21 @@ public static class OrderEndpoints
 
             order.RegisterReturn(clock);
             AddTimeline(db, order.Id, "Returned", null, clock);
-            // The goods are back in the warehouse: Inventory puts them on the shelf again.
-            await bus.Publish(new ReleaseStock(order.Id), ct);
             db.AddIntegrationEvent(new OrderReturnedV1(order.Id, order.CustomerId.ToString(), order.ReturnedAt!.Value,
                 ToIntegrationLines(order)), clock);
             await db.SaveChangesAsync(ct);
+            return Results.Ok(ToDto(order));
+        });
+
+        // Changed their mind, or the parcel never left: the return is cancelled and the order is shipped again.
+        group.MapPost("/{id:guid}/return/cancel", async (Guid id, HttpRequest http, OrdersDbContext db, TimeProvider clock, CancellationToken ct) =>
+        {
+            if (CustomerId(http) is not { } customerId)
+                return Results.Problem("Missing customer identity.", statusCode: 401);
+            if (await db.Orders.FirstOrDefaultAsync(o => o.Id == id && o.CustomerId == customerId, ct) is not { } order)
+                return Results.NotFound();
+
+            await CancelReturn(order, db, clock, ct);
             return Results.Ok(ToDto(order));
         });
 
@@ -122,6 +132,28 @@ public static class OrderEndpoints
             AddTimeline(db, order.Id, "Shipped", null, clock);
             db.AddIntegrationEvent(new OrderShippedV1(order.Id, order.CustomerId.ToString(), order.ShippedAt!.Value), clock);
             await db.SaveChangesAsync(ct);
+            return Results.Ok(ToDto(order));
+        });
+
+        // The returned goods arrived: only now do they go back on the shelf.
+        admin.MapPost("/{id:guid}/return/receive", async (Guid id, OrdersDbContext db, IPublishEndpoint bus, TimeProvider clock, CancellationToken ct) =>
+        {
+            if (await db.Orders.FirstOrDefaultAsync(o => o.Id == id, ct) is not { } order)
+                return Results.NotFound();
+
+            order.ReceiveReturn(clock);
+            AddTimeline(db, order.Id, "ReturnReceived", null, clock);
+            await bus.Publish(new ReleaseStock(order.Id), ct);
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(ToDto(order));
+        });
+
+        admin.MapPost("/{id:guid}/return/cancel", async (Guid id, OrdersDbContext db, TimeProvider clock, CancellationToken ct) =>
+        {
+            if (await db.Orders.FirstOrDefaultAsync(o => o.Id == id, ct) is not { } order)
+                return Results.NotFound();
+
+            await CancelReturn(order, db, clock, ct);
             return Results.Ok(ToDto(order));
         });
 
@@ -169,6 +201,15 @@ public static class OrderEndpoints
     private static void AddTimeline(OrdersDbContext db, Guid orderId, string step, string? detail, TimeProvider clock) =>
         db.Timeline.Add(new TimelineEntry { OrderId = orderId, Step = step, Detail = detail, At = clock.GetUtcNow() });
 
+    /// <summary>Shared by the customer and the admin route. Stock is untouched: it only moves when a return is received.</summary>
+    private static async Task CancelReturn(Order order, OrdersDbContext db, TimeProvider clock, CancellationToken ct)
+    {
+        order.CancelReturn();
+        AddTimeline(db, order.Id, "ReturnCancelled", null, clock);
+        db.AddIntegrationEvent(new OrderReturnCancelledV1(order.Id, order.CustomerId.ToString(), clock.GetUtcNow()), clock);
+        await db.SaveChangesAsync(ct);
+    }
+
     public static List<IntegrationOrderLine> ToIntegrationLines(Order o) =>
         o.Lines.Select(l => new IntegrationOrderLine(l.Sku, l.Quantity, l.UnitPrice)).ToList();
 
@@ -179,6 +220,6 @@ public static class OrderEndpoints
     private static object ToDto(Order o) => new
     {
         o.Id, o.CustomerId, Status = o.Status.ToString(), o.RejectionReason, o.Currency, o.CreatedAt,
-        o.ConfirmedAt, o.ShippedAt, o.ActivatedAt, o.ReturnedAt, o.RefundedAt, o.RefundAmount, o.Lines, o.Total,
+        o.ConfirmedAt, o.ShippedAt, o.ActivatedAt, o.ReturnedAt, o.ReturnReceivedAt, o.RefundedAt, o.RefundAmount, o.Lines, o.Total,
     };
 }

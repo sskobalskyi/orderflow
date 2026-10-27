@@ -23,7 +23,8 @@
     "status": "Status",
     "select": "Select an order to see its timeline.",
     "loading": "Loading…",
-    "return": "Return"
+    "return": "Return",
+    "cancelReturn": "Cancel return"
   },
   "status": {
     "Submitted": "Submitted",
@@ -46,6 +47,8 @@
       "Shipped": "Order shipped",
       "Activated": "Put into use",
       "Returned": "Return registered",
+      "ReturnReceived": "Return received",
+      "ReturnCancelled": "Return cancelled",
       "Refunded": "Refund issued"
     }
   },
@@ -54,6 +57,8 @@
     "customer": "Customer",
     "ship": "Mark shipped",
     "refund": "Refund",
+    "receiveReturn": "Receive return",
+    "cancelReturn": "Cancel return",
     "empty": "No orders yet."
   },
   "reasons": {
@@ -72,6 +77,9 @@
     "order_not_shippable": "Only a confirmed order can be shipped.",
     "order_not_returnable": "Only a shipped order can be returned.",
     "order_not_refundable": "Only a paid order can be refunded.",
+    "order_return_not_cancellable": "Only a return that was not received yet can be cancelled.",
+    "order_return_not_receivable": "Only a registered return can be received.",
+    "order_return_already_received": "This return was already received.",
     "order_already_refunded": "This order was already refunded.",
     "refund_invalid_amount": "The refund must be positive and at most the order total."
   }

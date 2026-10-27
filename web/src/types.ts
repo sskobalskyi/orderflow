@@ -14,6 +14,8 @@ export interface Order {
   createdAt: string
   /** Set when an outside system reported the goods of a shipped order in use. */
   activatedAt?: string | null
+  /** Set once an admin confirmed the returned goods arrived back. */
+  returnReceivedAt?: string | null
   lines: OrderLine[]
   total: number
 }

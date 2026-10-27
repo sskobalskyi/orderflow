@@ -102,4 +102,61 @@ public class OrderTests
         Assert.Equal("order_already_refunded", Assert.Throws<DomainException>(() => order.EnsureRefundable(null)).Code);
         Assert.False(order.MarkRefunded(25.5m, "x", Clock));
     }
+
+    private static Order ReturnedOrder()
+    {
+        var order = ConfirmedOrder();
+        order.Ship(Clock);
+        order.RegisterReturn(Clock);
+        return order;
+    }
+
+    [Fact]
+    public void Cancelling_a_return_puts_the_order_back_to_shipped()
+    {
+        var order = ReturnedOrder();
+
+        order.CancelReturn();
+
+        Assert.Equal(OrderStatus.Shipped, order.Status);
+        Assert.Null(order.ReturnedAt);
+    }
+
+    [Fact]
+    public void A_cancelled_return_can_be_registered_again()
+    {
+        var order = ReturnedOrder();
+        order.CancelReturn();
+
+        order.RegisterReturn(Clock);
+
+        Assert.Equal(OrderStatus.Returned, order.Status);
+    }
+
+    [Fact]
+    public void Only_a_registered_return_can_be_cancelled() =>
+        Assert.Equal("order_return_not_cancellable", Assert.Throws<DomainException>(() => ConfirmedOrder().CancelReturn()).Code);
+
+    [Fact]
+    public void A_received_return_cannot_be_cancelled()
+    {
+        var order = ReturnedOrder();
+        order.ReceiveReturn(Clock);
+
+        Assert.Equal("order_return_not_cancellable", Assert.Throws<DomainException>(() => order.CancelReturn()).Code);
+    }
+
+    [Fact]
+    public void A_return_is_received_once()
+    {
+        var order = ReturnedOrder();
+        order.ReceiveReturn(Clock);
+
+        Assert.NotNull(order.ReturnReceivedAt);
+        Assert.Equal("order_return_already_received", Assert.Throws<DomainException>(() => order.ReceiveReturn(Clock)).Code);
+    }
+
+    [Fact]
+    public void Only_a_registered_return_can_be_received() =>
+        Assert.Equal("order_return_not_receivable", Assert.Throws<DomainException>(() => ConfirmedOrder().ReceiveReturn(Clock)).Code);
 }

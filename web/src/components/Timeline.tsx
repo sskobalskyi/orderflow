@@ -43,7 +43,7 @@ export function Timeline({ orderId }: { orderId: string | null }) {
           <ol className="ml-2 border-l-2 border-border">
             {data?.map((s) => (
               <li
-                key={s.step}
+                key={`${s.step}-${s.at}`}
                 data-failed={FAILED.has(s.step)}
                 className={cn(
                   'relative grid gap-0.5 py-1 pb-3 pl-4 before:absolute before:top-2.5 before:-left-[7px] before:size-3 before:rounded-full before:bg-success before:content-[""]',

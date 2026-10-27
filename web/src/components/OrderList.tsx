@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ApiError, listOrders, listProducts, returnOrder } from '@/api'
+import { ApiError, cancelReturn, listOrders, listProducts, returnOrder } from '@/api'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -25,8 +25,8 @@ export function OrderList({ selected, onSelect }: { selected: string | null; onS
   const nameOf = (sku: string) => products?.find((p) => p.sku === sku)?.name ?? sku
 
   const returning = useMutation({
-    mutationFn: returnOrder,
-    onSuccess: (_, id) => {
+    mutationFn: ({ id, undo }: { id: string; undo: boolean }) => (undo ? cancelReturn(id) : returnOrder(id)),
+    onSuccess: (_, { id }) => {
       void queryClient.invalidateQueries({ queryKey: ['orders'] })
       void queryClient.invalidateQueries({ queryKey: ['timeline', id] })
     },
@@ -78,10 +78,23 @@ export function OrderList({ selected, onSelect }: { selected: string | null; onS
                         disabled={returning.isPending}
                         onClick={(e) => {
                           e.stopPropagation()
-                          returning.mutate(o.id)
+                          returning.mutate({ id: o.id, undo: false })
                         }}
                       >
                         {t('orders.return')}
+                      </Button>
+                    )}
+                    {o.status === 'Returned' && !o.returnReceivedAt && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={returning.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          returning.mutate({ id: o.id, undo: true })
+                        }}
+                      >
+                        {t('orders.cancelReturn')}
                       </Button>
                     )}
                   </TableCell>

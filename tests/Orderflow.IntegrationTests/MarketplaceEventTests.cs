@@ -220,8 +220,15 @@ public class MarketplaceEventTests(StackFixture stack)
         }
     }
 
+    private Task<HttpResponseMessage> CancelReturnAsCustomer(Guid customer, Guid order)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/orders/{order}/return/cancel");
+        req.Headers.Add("X-Customer-Id", customer.ToString());
+        return stack.Orders.SendAsync(req);
+    }
+
     [Fact]
-    public async Task A_return_puts_the_goods_back_on_the_shelf()
+    public async Task Registering_a_return_does_not_restock_until_the_goods_are_received()
     {
         var (customer, id) = await ConfirmedOrder(); // 2 x LAMP-01 and 1 x MUG-01
         (await Admin(id, "ship")).EnsureSuccessStatusCode();
@@ -229,8 +236,82 @@ public class MarketplaceEventTests(StackFixture stack)
         var mugs = await SettledAvailable("MUG-01");
 
         (await Return(customer, id)).EnsureSuccessStatusCode();
+        await Task.Delay(1500);
+        Assert.Equal(lamps, await Available("LAMP-01"));
+
+        (await Admin(id, "return/receive")).EnsureSuccessStatusCode();
 
         await Eventually(async () => await Available("LAMP-01") == lamps + 2 && await Available("MUG-01") == mugs + 1);
+        Assert.Contains("ReturnReceived", await Steps(customer, id));
+    }
+
+    [Fact]
+    public async Task Cancelling_a_return_ships_the_order_again_and_publishes_order_return_cancelled_v1()
+    {
+        var (customer, id) = await ConfirmedOrder();
+        (await Admin(id, "ship")).EnsureSuccessStatusCode();
+        (await Return(customer, id)).EnsureSuccessStatusCode();
+        var lamps = await SettledAvailable("LAMP-01");
+
+        var res = await CancelReturnAsCustomer(customer, id);
+
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        var evt = await stack.Events.WaitFor("order.return_cancelled.v1", p => p["orderId"]!.GetValue<string>() == id.ToString());
+        AssertConforms(evt);
+        Assert.Equal(customer.ToString(), evt.Payload["customerId"]!.GetValue<string>());
+        await WaitForStatus(customer, id, "Shipped");
+        Assert.Contains("ReturnCancelled", await Steps(customer, id));
+
+        // Cancelling never touches stock: the goods were never back in the warehouse.
+        await Task.Delay(1500);
+        Assert.Equal(lamps, await Available("LAMP-01"));
+    }
+
+    [Fact]
+    public async Task An_admin_can_cancel_a_return_and_the_order_can_be_returned_again()
+    {
+        var (customer, id) = await ConfirmedOrder();
+        (await Admin(id, "ship")).EnsureSuccessStatusCode();
+        (await Return(customer, id)).EnsureSuccessStatusCode();
+
+        (await Admin(id, "return/cancel")).EnsureSuccessStatusCode();
+        await WaitForStatus(customer, id, "Shipped");
+
+        (await Return(customer, id)).EnsureSuccessStatusCode();
+        await WaitForStatus(customer, id, "Returned");
+        Assert.Equal(2, (await Steps(customer, id)).Count(s => s == "Returned"));
+    }
+
+    [Fact]
+    public async Task A_return_cannot_be_cancelled_once_it_was_received_or_when_there_is_none()
+    {
+        var (customer, id) = await ConfirmedOrder();
+        var none = await CancelReturnAsCustomer(customer, id);
+        Assert.Equal((HttpStatusCode)422, none.StatusCode);
+        Assert.Equal("order_return_not_cancellable", (await none.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+
+        (await Admin(id, "ship")).EnsureSuccessStatusCode();
+        (await Return(customer, id)).EnsureSuccessStatusCode();
+        (await Admin(id, "return/receive")).EnsureSuccessStatusCode();
+
+        var received = await CancelReturnAsCustomer(customer, id);
+        Assert.Equal((HttpStatusCode)422, received.StatusCode);
+
+        var again = await Admin(id, "return/receive");
+        Assert.Equal((HttpStatusCode)422, again.StatusCode);
+        Assert.Equal("order_return_already_received", (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Customers_cannot_cancel_someone_elses_return()
+    {
+        var (customer, id) = await ConfirmedOrder();
+        (await Admin(id, "ship")).EnsureSuccessStatusCode();
+        (await Return(customer, id)).EnsureSuccessStatusCode();
+
+        var res = await CancelReturnAsCustomer(Guid.NewGuid(), id);
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
     }
 
     [Fact]
@@ -245,11 +326,25 @@ public class MarketplaceEventTests(StackFixture stack)
     }
 
     [Fact]
-    public async Task Refunding_after_a_return_does_not_restock_twice()
+    public async Task Refunding_a_return_that_is_on_its_way_releases_the_stock_once()
     {
         var (customer, id) = await ConfirmedOrder();
         (await Admin(id, "ship")).EnsureSuccessStatusCode();
         (await Return(customer, id)).EnsureSuccessStatusCode();
+        var lamps = await SettledAvailable("LAMP-01");
+
+        (await Admin(id, "refund")).EnsureSuccessStatusCode();
+
+        await Eventually(async () => await Available("LAMP-01") == lamps + 2);
+    }
+
+    [Fact]
+    public async Task Refunding_after_the_return_was_received_does_not_restock_twice()
+    {
+        var (customer, id) = await ConfirmedOrder();
+        (await Admin(id, "ship")).EnsureSuccessStatusCode();
+        (await Return(customer, id)).EnsureSuccessStatusCode();
+        (await Admin(id, "return/receive")).EnsureSuccessStatusCode();
         var lamps = await SettledAvailable("LAMP-01");
 
         (await Admin(id, "refund")).EnsureSuccessStatusCode();

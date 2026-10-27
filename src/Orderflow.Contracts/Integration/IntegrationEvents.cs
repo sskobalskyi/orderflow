@@ -12,6 +12,7 @@ public static class IntegrationAddress
     public const string OrderConfirmed = "order.confirmed.v1";
     public const string OrderShipped = "order.shipped.v1";
     public const string OrderReturned = "order.returned.v1";
+    public const string OrderReturnCancelled = "order.return_cancelled.v1";
     public const string OrderRefunded = "order.refunded.v1";
     /// <summary>Consumed, not published: another system reports the goods of an order in use.</summary>
     public const string DeviceClaimed = "device.claimed.v1";
@@ -24,5 +25,7 @@ public record OrderConfirmedV1(Guid OrderId, string CustomerId, IReadOnlyList<In
 public record OrderShippedV1(Guid OrderId, string CustomerId, DateTimeOffset ShippedAt);
 
 public record OrderReturnedV1(Guid OrderId, string CustomerId, DateTimeOffset ReturnedAt, IReadOnlyList<IntegrationOrderLine> Lines);
+
+public record OrderReturnCancelledV1(Guid OrderId, string CustomerId, DateTimeOffset CancelledAt);
 
 public record OrderRefundedV1(Guid OrderId, string CustomerId, decimal Amount, string Currency, DateTimeOffset RefundedAt, string? Reason);

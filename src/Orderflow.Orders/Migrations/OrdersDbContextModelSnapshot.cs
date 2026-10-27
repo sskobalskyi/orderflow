@@ -228,6 +228,9 @@ namespace Orderflow.Orders.Migrations
                     b.Property<string>("RejectionReason")
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("ReturnReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("ReturnedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -269,8 +272,7 @@ namespace Orderflow.Orders.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderId", "Step")
-                        .IsUnique();
+                    b.HasIndex("OrderId", "Step");
 
                     b.ToTable("order_timeline", "app");
                 });
