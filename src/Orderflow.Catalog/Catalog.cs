@@ -69,7 +69,7 @@ public static class ProductEndpoints
         app.MapGet("/products", async (HttpRequest http, CatalogDbContext db, CancellationToken ct) =>
         {
             var locale = Locale(http);
-            var products = await db.Products.AsNoTracking().Where(p => p.Active).OrderBy(p => p.Sku).ToListAsync(ct);
+            var products = await db.Products.AsNoTracking().Where(p => p.Active).OrderBy(p => p.Price).ThenBy(p => p.Sku).ToListAsync(ct);
             return Results.Ok(products.Select(p => ToDto(p, locale)));
         });
 
