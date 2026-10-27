@@ -86,7 +86,8 @@ export function Shop({ onOrdered }: { onOrdered: (orderId: string) => void }) {
             {mutation.isPending ? t('shop.submitting') : t('shop.submit')}
           </Button>
           {mutation.error instanceof ApiError && <Alert variant="destructive">{t(mutation.error.key)}</Alert>}
-          <p className="text-xs text-muted-foreground">{t('shop.hint')}</p>
+          {/* The demo hint only makes sense for the bundled demo catalog, not for a deployment that sells its own products. */}
+          {products?.some((p) => p.sku === 'DESK-01') && <p className="text-xs text-muted-foreground">{t('shop.hint')}</p>}
         </CardContent>
       </Card>
     </div>

@@ -174,6 +174,15 @@ public class OrderFlowTests(StackFixture stack)
     }
 
     [Fact]
+    public async Task Catalog_lists_the_cheapest_products_first()
+    {
+        var products = await stack.Catalog.GetFromJsonAsync<JsonElement>("/products");
+
+        var prices = products.EnumerateArray().Select(p => p.GetProperty("price").GetDecimal()).ToList();
+        Assert.Equal(prices.Order(), prices);
+    }
+
+    [Fact]
     public async Task Catalog_lists_products_in_the_requested_language()
     {
         var en = await stack.Catalog.GetFromJsonAsync<JsonElement>("/products?lang=en");
