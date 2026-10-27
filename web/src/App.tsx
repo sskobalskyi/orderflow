@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LOCALES, type Locale } from '@/i18n'
+import { branding } from '@/config'
 import { isAdmin } from '@/roles'
 
 export default function App() {
@@ -32,7 +33,14 @@ export default function App() {
   return (
     <div className="mx-auto grid max-w-6xl gap-6 p-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{t('app.title')}</h1>
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <h1 className="text-2xl font-bold">{branding.shopName}</h1>
+          {branding.homeUrl && (
+            <a href={branding.homeUrl} className="text-sm text-primary underline-offset-4 hover:underline" data-testid="home-link">
+              {t('app.backHome')}
+            </a>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <Select value={locale} onValueChange={(l) => void i18n.changeLanguage(l)}>
             <SelectTrigger aria-label={t('app.language')} className="w-20">

@@ -185,6 +185,19 @@ services:
 
 Both files are only read when their table is empty; use `docker compose down -v` to start over. Orderflow stays generic: it knows SKUs, prices, names and quantities, not what is in the box.
 
+The UI can carry the deployment's branding too. Two optional build arguments of the `web` image set the name in the header and the tab title, and a link back to the main app (only `http` and `https` links are used):
+
+```yaml
+  web:
+    build:
+      context: ./web
+      args:
+        VITE_SHOP_NAME: Greenhaus shop
+        VITE_HOME_URL: http://localhost:5174
+```
+
+Without them the UI says "Orderflow" and shows no link.
+
 ## Observability
 
 Every service exports OpenTelemetry over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.

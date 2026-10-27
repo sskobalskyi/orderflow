@@ -1,5 +1,5 @@
 {
-  "app": { "title": "Orderflow", "language": "Мова" },
+  "app": { "title": "Orderflow", "language": "Мова", "backHome": "Повернутись до основного застосунку" },
   "auth": { "signIn": "Увійти", "signOut": "Вийти", "signedInAs": "Ви увійшли як {{name}}", "welcome": "Увійдіть, щоб купувати й відстежувати замовлення." },
   "tabs": { "shop": "Магазин", "orders": "Мої замовлення", "admin": "Адмін" },
   "shop": {

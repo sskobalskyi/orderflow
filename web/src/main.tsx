@@ -5,6 +5,9 @@ import './i18n'
 import './index.css'
 import App from './App'
 import { handleRedirectCallback } from './auth'
+import { branding } from './config'
+
+document.title = branding.shopName
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
