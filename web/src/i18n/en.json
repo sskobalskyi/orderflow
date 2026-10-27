@@ -1,5 +1,5 @@
 {
-  "app": { "title": "Orderflow", "language": "Language" },
+  "app": { "title": "Orderflow", "language": "Language", "backHome": "Back to the main app" },
   "auth": { "signIn": "Sign in", "signOut": "Sign out", "signedInAs": "Signed in as {{name}}", "welcome": "Sign in to shop and track your orders." },
   "tabs": { "shop": "Shop", "orders": "My orders", "admin": "Admin" },
   "shop": {
